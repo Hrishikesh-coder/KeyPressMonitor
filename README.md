@@ -41,8 +41,8 @@ Type anywhere in the console (or across any webpage with the Chrome Extension) a
 | Top 5 keys + N-gram tracker | Counts every letter pair (676-entry table) and letter triple (17,576-entry table) inside words; shows the top 5 keys, bigrams and trigrams side by side |
 | Ergonomics & Biomechanics (F6) | Tracks Left vs. Right hand balance %, hand alternations, 8-finger load distribution (`L-Pinky`..`R-Pinky` + `Thumbs`), and keyboard row usage (`Number`, `Top`, `Home`, `Bottom`, `Space`) |
 | Rhythm & Cadence analytics | Measures average inter-key latency (ms), fastest key transition (ms), and active typing time (filtering idle pauses >= 2 s) |
-| Achievements, Streaks & XP Rank | Tracks live & best error-free key streaks, computes XP & rank (`NOVICE` → `TYPIST` → `PRO` → `MASTER` → `GRANDMASTER`), and unlocks 6 achievement badges |
-| Custom Themes (F7) & Sound (F8) | `F7` cycles 4 colour themes (`Midnight`, `Cyberpunk Neon`, `Matrix Hacker`, `Nord Frost`). `F8` toggles synthesized mechanical key clicks via `Beep` |
+| Achievements, Streaks & XP Rank | Tracks live & best error-free key streaks, dynamic streak flame multipliers, computes XP & rank (`NOVICE` → `TYPIST` → `PRO` → `MASTER` → `GRANDMASTER`), and unlocks 8-12 achievement badges |
+| Custom Themes (F7) & Sound (F8) | `F7` cycles 8 colour themes (`Midnight`, `Cyberpunk Neon`, `Matrix Hacker`, `Nord Frost`, `Dracula`, `Synthwave Sunset`, `Solarized Dark`, `Retro Amber CRT`). `F8` toggles synthesized mechanical key clicks (with 5 switch profiles: Cherry MX Blue, Brown Thock, IBM Model M, Typewriter with Bell, Sci-Fi Blaster) |
 | Multi-Mode Typing Test (F5 / Tab) | `F5` opens the typing test; `Tab` cycles 4 practice categories (`STANDARD`, `QUOTES`, `CODE`, `NUMBERS`). Tracks live WPM, accuracy %, errors, session best and all-time best |
 | Multi-format Export (F2) | Writes `KeyReport.txt`, `KeyReport.html` (with charts, opened in browser), `KeyReport.csv` and `KeyReport.json` |
 | Compare with last session | Each session is saved to `KeyStats.dat` on exit. The next run shows `VS LAST` (average and peak WPM with up/down arrows, all-time best) |
@@ -53,7 +53,7 @@ Type anywhere in the console (or across any webpage with the Chrome Extension) a
 | Heatmap modes (Up / Down) | The keyboard heatmap switches between **frequency**, **speed** (average ms to reach each key; slow keys are hot) and **test misses** (keys you got wrong in the typing test). Click the heatmap to cycle too |
 | Text analysis (F6 twice) | Shannon entropy of your letters (bits/letter), % overlap with English letter shares, a chi-squared test against English (df 25), and the Caesar shift that makes the text most English-like (it decodes ROT-n). Computed on the x87 FPU (`FYL2X` for log2), also in both reports |
 | Self-test (`/selftest`) | `KeyMonitor.exe /selftest` types a known sentence through the real counting code and checks 15 results (vowels, consonants, frequency, last N, words, n-grams...). Prints PASS/FAIL and exits with the number of failures; CI runs it on every push |
-| Chrome Extension (Manifest V3) | Full browser extension in `chrome-extension/` with popup & full-tab dashboard, live webpage keystroke telemetry, all 3 views, 4 themes, Web Audio synth clicks, and JSON/CSV export |
+| Chrome Extension (Manifest V3) | Full browser extension in `chrome-extension/` with popup & full-tab dashboard, live webpage keystroke telemetry, 5 views (Dashboard, Typing Test, Biomechanics & Fatigue, Word Blitz Arcade, Zen & Crypto Lab), 8 themes, 5 switch sound profiles, particle sparks, and JSON/CSV export |
 
 ## Controls
 

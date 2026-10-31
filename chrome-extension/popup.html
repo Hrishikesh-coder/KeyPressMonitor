@@ -7,6 +7,9 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <!-- Particle FX Canvas Overlay -->
+  <canvas id="fxCanvas"></canvas>
+
   <!-- Header -->
   <header class="header">
     <div class="brand">
@@ -17,6 +20,21 @@
     <div class="hdr-right">
       <a href="KeyPressMonitor-Chrome-Extension.zip" download class="pill-btn purp" id="btnDownloadExt" style="text-decoration:none;padding:2px 8px;font-size:11px;display:none" title="Download the Chrome Extension (.zip) to track typing across all websites"><span>⬇ Get Chrome Extension (.zip)</span></a>
       <button class="pill-btn red" id="btnHeaderReset" title="Refresh & Clear All Records (F1)" style="padding:2px 8px;font-size:11px"><span>↻ Refresh / Clear All</span></button>
+
+      <!-- Dynamic Combo Multiplier Pill -->
+      <div class="combo-pill hidden" id="hdrCombo" title="Current uninterrupted streak multiplier">
+        <span>🔥</span><span id="hdrComboTxt">10x COMBO</span>
+      </div>
+
+      <!-- Sound Profile Selector -->
+      <select id="selSoundProfile" class="sound-select" title="Mechanical switch sound profile">
+        <option value="blue">Switch: Cherry MX Blue</option>
+        <option value="brown">Switch: MX Brown (Thock)</option>
+        <option value="modelm">Switch: IBM Model M</option>
+        <option value="typewriter">Switch: Typewriter (Bell)</option>
+        <option value="scifi">Switch: Sci-Fi Blaster</option>
+      </select>
+
       <div class="xp-pill">
         <span class="xp-lvl" id="hdrLevel">LVL 1</span>
         <span class="xp-rank" id="hdrRank">NOVICE</span>
@@ -32,6 +50,15 @@
   </header>
 
   <main class="container">
+    <!-- View Navigation Tab Strip -->
+    <nav class="view-nav-tabs">
+      <button class="nav-tab active" data-view="0" id="tabDash">📊 Dashboard</button>
+      <button class="nav-tab" data-view="1" id="tabTest">⚡ Typing Test</button>
+      <button class="nav-tab" data-view="2" id="tabErgo">🧬 Biomechanics & XP</button>
+      <button class="nav-tab" data-view="3" id="tabArcade">🎮 Word Blitz Arcade</button>
+      <button class="nav-tab" data-view="4" id="tabZen">📜 Zen & Crypto Lab</button>
+    </nav>
+
     <!-- VIEW 0: MAIN DASHBOARD -->
     <section id="viewDash">
       <div class="cards-grid">
@@ -170,7 +197,8 @@
       <div class="panel">
         <div class="panel-hdr">
           <span>TYPING TEST — TYPE THIS SENTENCE</span>
-          <div>
+          <div style="display:flex;gap:6px">
+            <button class="n-btn" id="btnCustomText">✏️ Custom Text</button>
             <button class="n-btn" id="btnCycleMode">Tab: Change Mode</button>
             <button class="n-btn" id="btnNextSent">Enter: Next Sentence</button>
           </div>
@@ -184,12 +212,12 @@
       <div class="panel">
         <div class="panel-hdr"><span>INSTRUCTIONS & RESULT</span></div>
         <div id="ttStatus" style="color:var(--muted);line-height:1.6">
-          Start typing anywhere in this window! Green = right, Red = mistake, Backspace = fix it, Tab = switch mode (Standard, Quotes, Code, Numbers).
+          Start typing anywhere in this window! Green = right, Red = mistake, Backspace = fix it, Tab = switch mode (Standard, Quotes, Code, Numbers, Pangrams, Dev Wisdom).
         </div>
       </div>
     </section>
 
-    <!-- VIEW 2: BIOMECHANICS, RHYTHM & ACHIEVEMENTS (F6) -->
+    <!-- VIEW 2: BIOMECHANICS, RHYTHM, FATIGUE & ACHIEVEMENTS (F6) -->
     <section id="viewErgo" class="hidden">
       <div class="cards-grid">
         <div class="card">
@@ -208,9 +236,9 @@
           <div class="card-sub">fastest <b id="erMinLat" style="color:#fff">0</b> ms</div>
         </div>
         <div class="card">
-          <div class="card-title">Key Streak</div>
-          <div class="card-val" style="color:var(--green)" id="erStreak">0</div>
-          <div class="card-sub">best <b id="erBestStreak" style="color:var(--gold)">0</b> · XP <b id="erXP" style="color:var(--cyan)">0</b></div>
+          <div class="card-title">Typing Strain Index</div>
+          <div class="card-val" style="color:var(--green)" id="erStrain">0%</div>
+          <div class="card-sub">status: <b id="erStrainTxt" style="color:var(--green)">RELAXED</b></div>
         </div>
       </div>
 
@@ -225,6 +253,7 @@
           <div style="margin-top:10px;font-family:Consolas,monospace;font-size:11px;color:var(--muted);line-height:1.7">
             <div>Active Typing Time : <b id="erActiveTime" style="color:var(--cyan)">00:00</b></div>
             <div>Hand Alternations  : <b id="erAlt2" style="color:var(--green)">0</b></div>
+            <div>Key Streak (Current/Best): <b id="erStreak" style="color:var(--green)">0</b> / <b id="erBestStreak" style="color:var(--gold)">0</b></div>
           </div>
         </div>
       </div>
@@ -232,11 +261,135 @@
       <div class="panel">
         <div class="panel-hdr">
           <span>ACHIEVEMENTS & UNLOCKABLE BADGES</span>
-          <span class="muted" id="erBadgeSummary">0 / 6 Unlocked</span>
+          <span class="muted" id="erBadgeSummary">0 / 12 Unlocked</span>
         </div>
         <div class="badges-grid" id="badgesGrid"></div>
       </div>
     </section>
+
+    <!-- VIEW 3: WORD BLITZ ARCADE GAME -->
+    <section id="viewArcade" class="hidden">
+      <div class="arcade-header">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-weight:700;color:var(--gold)">WORD BLITZ ARCADE</span>
+          <span class="muted">Difficulty:</span>
+          <select id="selArcadeDiff" class="sound-select">
+            <option value="chill">Casual (Slow)</option>
+            <option value="speed" selected>Speedster (Normal)</option>
+            <option value="hacker">Hacker (Code Tokens)</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;font-family:Consolas,monospace">
+          <div>SHIELDS: <span id="arcShields" style="color:var(--red);font-size:14px">❤️❤️❤️</span></div>
+          <div>COMBO: <b id="arcCombo" style="color:var(--gold)">1x</b></div>
+          <div>SCORE: <b id="arcScore" style="color:var(--cyan);font-size:16px">0</b></div>
+          <div>HIGH: <b id="arcHighScore" style="color:var(--purp)">0</b></div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="pill-btn green" id="btnArcadeStart"><span>▶ Start Game</span></button>
+          <button class="pill-btn red" id="btnArcadeReset"><span>↺ Reset</span></button>
+        </div>
+      </div>
+
+      <div class="arcade-arena" id="arcadeArena">
+        <div class="danger-line"></div>
+        <div id="arcadePrompt" style="position:absolute;top:40%;left:50%;transform:translate(-50%,-50%);text-align:center;color:var(--muted)">
+          <div style="font-size:16px;font-weight:700;color:#fff;margin-bottom:6px">Press 'Start Game' to Begin</div>
+          <div>Type the falling words before they cross the red line!</div>
+        </div>
+        <!-- Falling words are injected dynamically here -->
+      </div>
+      <div class="arcade-stats-row">
+        <div class="chip">WORDS DESTROYED: <b id="arcWords" style="color:var(--green)">0</b></div>
+        <div class="chip">ACCURACY: <b id="arcAcc" style="color:var(--cyan)">100%</b></div>
+        <div class="chip">MAX COMBO: <b id="arcMaxCombo" style="color:var(--gold)">0x</b></div>
+        <div class="chip">WAVE: <b id="arcWave" style="color:var(--purp)">1</b></div>
+      </div>
+    </section>
+
+    <!-- VIEW 4: ZEN SCRATCHPAD & LINGUISTICS LAB -->
+    <section id="viewZen" class="hidden">
+      <div class="zen-grid">
+        <div>
+          <div class="panel" style="margin-bottom:8px">
+            <div class="panel-hdr">
+              <span>LIVE SCRATCHPAD & FREE-TYPING LAB</span>
+              <div style="display:flex;gap:6px">
+                <button class="n-btn" id="btnZenPangram">Pangram</button>
+                <button class="n-btn" id="btnZenQuote">Quote</button>
+                <button class="n-btn" id="btnZenRot">ROT-13 Sample</button>
+                <button class="n-btn" id="btnZenClear">Clear</button>
+              </div>
+            </div>
+            <textarea class="zen-editor" id="zenEditor" placeholder="Type or paste any text here to watch real-time readability, Shannon entropy and Caesar cipher analytics..."></textarea>
+          </div>
+
+          <div class="panel">
+            <div class="panel-hdr">
+              <span>CAESAR CIPHER ROT-N DECRYPTOR (x87 CHI-SQUARED ALGORITHM)</span>
+              <span id="zenRotDetected" style="color:var(--green);font-weight:700">Auto: ROT 0</span>
+            </div>
+            <div class="caesar-box">
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;margin-bottom:4px">
+                <span>Shift Amount: <b id="zenRotVal" style="color:var(--cyan)">ROT 0</b></span>
+                <span class="muted" id="zenChiScore">Chi-Squared: 0.0</span>
+              </div>
+              <input type="range" min="0" max="25" value="0" class="rot-slider" id="zenRotSlider">
+              <div style="font-size:11px;color:var(--muted);margin-top:6px;word-break:break-all" id="zenDecodedPreview">Decoded text will appear here...</div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="panel">
+            <div class="panel-hdr"><span>READABILITY & LINGUISTICS METRICS</span></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+              <div class="dial-card">
+                <div class="dial-val" style="color:var(--green)" id="zenFleschScore">100</div>
+                <div class="dial-sub">Flesch Reading Ease</div>
+                <div style="font-size:10px;color:var(--muted);margin-top:2px" id="zenFleschVerdict">Very Easy</div>
+              </div>
+              <div class="dial-card">
+                <div class="dial-val" style="color:var(--purp)" id="zenGradeLevel">1.0</div>
+                <div class="dial-sub">Grade Level</div>
+                <div style="font-size:10px;color:var(--muted);margin-top:2px">Elementary</div>
+              </div>
+              <div class="dial-card">
+                <div class="dial-val" style="color:var(--cyan)" id="zenEntropy">0.00</div>
+                <div class="dial-sub">Entropy (bits/char)</div>
+                <div style="font-size:10px;color:var(--muted);margin-top:2px" id="zenEntropyVerdict">Clean</div>
+              </div>
+              <div class="dial-card">
+                <div class="dial-val" style="color:var(--gold)" id="zenTTR">100%</div>
+                <div class="dial-sub">Lexical Diversity</div>
+                <div style="font-size:10px;color:var(--muted);margin-top:2px">Unique / Total</div>
+              </div>
+            </div>
+            <div style="background:var(--track);padding:8px 10px;border-radius:6px;border:1px solid var(--border);font-family:Consolas,monospace;font-size:11px;line-height:1.7">
+              <div>Characters : <b id="zenCharCount" style="color:#fff">0</b> · Words: <b id="zenWordCount" style="color:var(--green)">0</b></div>
+              <div>Sentences  : <b id="zenSentCount" style="color:var(--cyan)">0</b> · Syllables: <b id="zenSyllCount" style="color:var(--amber)">0</b></div>
+              <div>Read Time  : <b id="zenReadTime" style="color:var(--purp)">0s</b> · Speech: <b id="zenSpeakTime" style="color:var(--gold)">0s</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Custom Text Modal (in Typing Test) -->
+    <div id="modalCustomText" class="hidden">
+      <div class="custom-backdrop" id="modalBackdrop"></div>
+      <div class="custom-modal">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-weight:700;font-size:14px;color:#fff">Custom Practice Text</span>
+          <button class="n-btn" id="btnModalClose">✕</button>
+        </div>
+        <textarea id="txtCustomInput" style="width:100%;height:110px;background:var(--track);border:1px solid var(--border);border-radius:6px;color:#fff;font-family:Consolas,monospace;padding:8px;outline:none" placeholder="Paste any sentence, quote or code snippet here..."></textarea>
+        <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:10px">
+          <button class="pill-btn" id="btnModalCancel"><span>Cancel</span></button>
+          <button class="pill-btn green" id="btnModalSave"><span>Set Practice Text</span></button>
+        </div>
+      </div>
+    </div>
 
     <!-- Bottom Stats Strip -->
     <div class="stats-strip">
@@ -256,13 +409,14 @@
         <button class="pill-btn" id="btnReset"><kbd>F1</kbd><span>Reset</span></button>
         <button class="pill-btn" id="btnExport"><kbd>F2</kbd><span>Export HTML/CSV/JSON</span></button>
         <button class="pill-btn" id="btnPause"><kbd>F3</kbd><span id="lblPause">Pause</span></button>
+        <button class="pill-btn gold" id="btnArcade"><kbd>F4</kbd><span>Arcade</span></button>
         <button class="pill-btn purp" id="btnTest"><kbd>F5</kbd><span id="lblTest">Test</span></button>
         <button class="pill-btn cyan" id="btnErgo"><kbd>F6</kbd><span>Bio/XP</span></button>
         <button class="pill-btn green" id="btnTheme"><kbd>F7</kbd><span id="lblTheme">Theme</span></button>
         <button class="pill-btn" id="btnSound"><kbd>F8</kbd><span id="lblSound">Sound:Off</span></button>
         <button class="pill-btn" id="btnHud"><span id="lblHud">HUD:On</span></button>
       </div>
-      <div class=" all-right" style="display:flex;gap:6px">
+      <div class="all-right" style="display:flex;gap:6px">
         <button class="pill-btn" id="btnHelp" title="How to use KeyPressMonitor"><span>? Guide</span></button>
         <button class="pill-btn cyan" id="btnOpenTab" title="Open in full browser tab"><span>⛶ Full Tab</span></button>
       </div>

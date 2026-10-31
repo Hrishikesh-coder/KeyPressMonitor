@@ -1,4 +1,4 @@
-// KeyPressMonitor — Interactive Dashboard & Typing Test Controller
+// KeyPressMonitor — Enhanced Interactive Dashboard, Arcade & Linguistics Suite
 
 const KB_ROWS = [
   ['1','2','3','4','5','6','7','8','9','0','-','='],
@@ -7,7 +7,7 @@ const KB_ROWS = [
   ['Z','X','C','V','B','N','M',',','.','/']
 ];
 
-const THEMES = ['midnight', 'cyberpunk', 'matrix', 'nord'];
+const THEMES = ['midnight', 'cyberpunk', 'matrix', 'nord', 'dracula', 'synthwave', 'solarized', 'amber'];
 const RANKS = ['NOVICE', 'TYPIST', 'PRO', 'MASTER', 'GRANDMASTER'];
 const FINGER_NAMES = [
   'L-Pinky', 'L-Ring', 'L-Middle', 'L-Index',
@@ -37,39 +37,223 @@ const TEST_SENTENCES = {
     '192.168.1.254:8080 #42 = 100% - $39.95 + (2026 / 4) * 7!',
     '0xFF00AA55 -> [256 * 4] = 1024 bytes @ 60fps (33.3ms/frame)',
     'key #1: 98.6%, key #2: 450ms, total = 1,234,567 (0x12D687)'
+  ],
+  PANGRAMS: [
+    'the quick onyx goblin jumps over the lazy dwarf',
+    'waltz, bad nymph, for quick jigs vex',
+    'bright vixens jump; dozy fowl quack',
+    'how vexingly quick daft zebras jump'
+  ],
+  DEV_WISDOM: [
+    'there are only two hard things in Computer Science: cache invalidation and naming things',
+    'premature optimization is the root of all evil in programming',
+    'good code is its own best documentation as you write it'
+  ],
+  CUSTOM: [
+    'practice typing with your own custom sentence or code snippet'
   ]
 };
-const MODE_KEYS = ['STANDARD', 'QUOTES', 'CODE', 'NUMBERS'];
+const MODE_KEYS = ['STANDARD', 'QUOTES', 'CODE', 'NUMBERS', 'PANGRAMS', 'DEV_WISDOM', 'CUSTOM'];
+
+// English letter frequencies for Chi-Squared Caesar cipher cryptanalysis
+const ENG_FREQ = {
+  a: 0.0817, b: 0.0149, c: 0.0278, d: 0.0425, e: 0.1270, f: 0.0223, g: 0.0202,
+  h: 0.0609, i: 0.0697, j: 0.0015, k: 0.0077, l: 0.0403, m: 0.0241, n: 0.0675,
+  o: 0.0751, p: 0.0193, q: 0.0010, r: 0.0599, s: 0.0633, t: 0.0906, u: 0.0276,
+  v: 0.0098, w: 0.0236, x: 0.0015, y: 0.0197, z: 0.0007
+};
 
 let curState = null;
-let viewMode = 0; // 0=Dash, 1=Test, 2=Ergo
+let viewMode = 0; // 0=Dash, 1=Test, 2=Ergo, 3=Arcade, 4=Zen
 let audioCtx = null;
+let soundProfile = 'blue';
 
-// Typing test state
-let ttModeIdx = 0;
-let ttSentIdx = 0;
-let ttTarget = TEST_SENTENCES.STANDARD[0];
-let ttTyped = '';
-let ttErrors = 0;
-let ttKeys = 0;
-let ttStart = 0;
-let ttDone = false;
+// Particle FX Engine
+let fxParticles = [];
+let fxAnimFrame = null;
 
+function initFX() {
+  const canvas = document.getElementById('fxCanvas');
+  if (!canvas) return;
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  function loop() {
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    for (let i = fxParticles.length - 1; i >= 0; i--) {
+      const p = fxParticles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += p.gravity || 0.12;
+      p.alpha -= p.fade || 0.025;
+      if (p.rot !== undefined) p.rot += p.vRot || 0.05;
+
+      if (p.alpha <= 0) {
+        fxParticles.splice(i, 1);
+        continue;
+      }
+
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, p.alpha);
+      ctx.translate(p.x, p.y);
+      if (p.rot !== undefined) ctx.rotate(p.rot);
+      ctx.fillStyle = p.color;
+
+      if (p.shape === 'rect') {
+        ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 1.5);
+      } else {
+        ctx.beginPath();
+        ctx.arc(0, 0, p.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+    fxAnimFrame = requestAnimationFrame(loop);
+  }
+  loop();
+}
+
+function spawnKeySparks(x, y, color = '#67E8F9') {
+  for (let i = 0; i < 7; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 1.2 + Math.random() * 3.5;
+    fxParticles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 1.5,
+      gravity: 0.15,
+      alpha: 1.0,
+      fade: 0.04 + Math.random() * 0.03,
+      size: 2 + Math.random() * 2.5,
+      color
+    });
+  }
+}
+
+function spawnConfetti() {
+  const colors = ['#6EE7B7', '#FCD34D', '#67E8F9', '#C4B5FD', '#F472B6', '#FACC15', '#FF5555'];
+  const w = window.innerWidth;
+  for (let i = 0; i < 80; i++) {
+    fxParticles.push({
+      x: w / 2 + (Math.random() - 0.5) * 350,
+      y: window.innerHeight * 0.35 + (Math.random() - 0.5) * 100,
+      vx: (Math.random() - 0.5) * 12,
+      vy: -4 - Math.random() * 8,
+      gravity: 0.22,
+      rot: Math.random() * Math.PI,
+      vRot: (Math.random() - 0.5) * 0.2,
+      shape: 'rect',
+      alpha: 1.0,
+      fade: 0.012 + Math.random() * 0.015,
+      size: 5 + Math.random() * 5,
+      color: colors[Math.floor(Math.random() * colors.length)]
+    });
+  }
+}
+
+// Multi-Profile Mechanical Switch Sound Synthesizer
 function playClickSound(keyChar) {
   if (!curState || !curState.soundOn) return;
   try {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
+    const t = audioCtx.currentTime;
     const code = (keyChar && keyChar.charCodeAt(0)) || 65;
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(520 + (code & 31) * 14, audioCtx.currentTime);
-    gain.gain.setValueAtTime(0.06, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.025);
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    osc.start();
-    osc.stop(audioCtx.currentTime + 0.028);
+
+    if (soundProfile === 'blue') {
+      // Crisp tactile mechanical click + bounce
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(1800 + (code & 15) * 35, t);
+      osc.frequency.exponentialRampToValueAtTime(800, t + 0.02);
+      gain.gain.setValueAtTime(0.08, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.028);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(t);
+      osc.stop(t + 0.03);
+    } else if (soundProfile === 'brown') {
+      // Warm cushioned thud (thock)
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(320 + (code & 7) * 15, t);
+      osc.frequency.exponentialRampToValueAtTime(140, t + 0.04);
+      gain.gain.setValueAtTime(0.12, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.045);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(t);
+      osc.stop(t + 0.05);
+    } else if (soundProfile === 'modelm') {
+      // IBM Buckling Spring ping + clatter
+      const osc1 = audioCtx.createOscillator();
+      const gain1 = audioCtx.createGain();
+      osc1.type = 'square';
+      osc1.frequency.setValueAtTime(1250, t);
+      gain1.gain.setValueAtTime(0.05, t);
+      gain1.gain.exponentialRampToValueAtTime(0.001, t + 0.03);
+      osc1.connect(gain1);
+      gain1.connect(audioCtx.destination);
+      osc1.start(t);
+      osc1.stop(t + 0.035);
+
+      const osc2 = audioCtx.createOscillator();
+      const gain2 = audioCtx.createGain();
+      osc2.type = 'triangle';
+      osc2.frequency.setValueAtTime(2400, t);
+      gain2.gain.setValueAtTime(0.03, t);
+      gain2.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+      osc2.connect(gain2);
+      gain2.connect(audioCtx.destination);
+      osc2.start(t + 0.005);
+      osc2.stop(t + 0.065);
+    } else if (soundProfile === 'typewriter') {
+      // Vintage typewriter clack, and Bell on Enter!
+      if (keyChar === 'Enter') {
+        const bell = audioCtx.createOscillator();
+        const bGain = audioCtx.createGain();
+        bell.type = 'sine';
+        bell.frequency.setValueAtTime(2100, t);
+        bGain.gain.setValueAtTime(0.15, t);
+        bGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+        bell.connect(bGain);
+        bGain.connect(audioCtx.destination);
+        bell.start(t);
+        bell.stop(t + 0.55);
+      } else {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(450, t);
+        osc.frequency.exponentialRampToValueAtTime(150, t + 0.03);
+        gain.gain.setValueAtTime(0.07, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.035);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(t);
+        osc.stop(t + 0.04);
+      }
+    } else if (soundProfile === 'scifi') {
+      // Sci-Fi Blaster chirp
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(1400, t);
+      osc.frequency.exponentialRampToValueAtTime(350, t + 0.035);
+      gain.gain.setValueAtTime(0.06, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.038);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(t);
+      osc.stop(t + 0.04);
+    }
   } catch (_) {}
 }
 
@@ -110,34 +294,38 @@ function heatColor(cnt, maxCnt) {
 // Initialize DOM structures for A-Z histogram and QWERTY keyboard
 function initStaticDOM() {
   const histBars = document.getElementById('histBars');
-  histBars.innerHTML = '';
-  for (let i = 0; i < 26; i++) {
-    const ch = String.fromCharCode(65 + i);
-    const isV = 'AEIOU'.includes(ch);
-    const col = document.createElement('div');
-    col.className = 'hbar-col';
-    col.innerHTML = `<div class="hbar-fill ${isV ? 'vowel' : 'cons'}" id="hbar_${i}" style="height:2px"></div><div class="hbar-lbl" id="hlbl_${i}">${ch}</div>`;
-    histBars.appendChild(col);
+  if (histBars) {
+    histBars.innerHTML = '';
+    for (let i = 0; i < 26; i++) {
+      const ch = String.fromCharCode(65 + i);
+      const isV = 'AEIOU'.includes(ch);
+      const col = document.createElement('div');
+      col.className = 'hbar-col';
+      col.innerHTML = `<div class="hbar-fill ${isV ? 'vowel' : 'cons'}" id="hbar_${i}" style="height:2px"></div><div class="hbar-lbl" id="hlbl_${i}">${ch}</div>`;
+      histBars.appendChild(col);
+    }
   }
 
   const kbWrap = document.getElementById('kbWrap');
-  kbWrap.innerHTML = '';
-  KB_ROWS.forEach((row) => {
-    const rDiv = document.createElement('div');
-    rDiv.className = 'kb-row';
-    row.forEach((k) => {
-      const cap = document.createElement('div');
-      cap.className = 'keycap';
-      cap.id = 'kcap_' + k;
-      cap.textContent = k;
-      rDiv.appendChild(cap);
+  if (kbWrap) {
+    kbWrap.innerHTML = '';
+    KB_ROWS.forEach((row) => {
+      const rDiv = document.createElement('div');
+      rDiv.className = 'kb-row';
+      row.forEach((k) => {
+        const cap = document.createElement('div');
+        cap.className = 'keycap';
+        cap.id = 'kcap_' + k;
+        cap.textContent = k;
+        rDiv.appendChild(cap);
+      });
+      kbWrap.appendChild(rDiv);
     });
-    kbWrap.appendChild(rDiv);
-  });
-  const spRow = document.createElement('div');
-  spRow.className = 'kb-row';
-  spRow.innerHTML = `<div class="keycap space" id="kcap_SPC">SPACE</div>`;
-  kbWrap.appendChild(spRow);
+    const spRow = document.createElement('div');
+    spRow.className = 'kb-row';
+    spRow.innerHTML = `<div class="keycap space" id="kcap_SPC">SPACE</div>`;
+    kbWrap.appendChild(spRow);
+  }
 }
 
 function topEntries(obj, n = 5) {
@@ -147,19 +335,59 @@ function topEntries(obj, n = 5) {
     .slice(0, n);
 }
 
+// Expanded 12 Badges & Gamification
 function computeXPAndBadges(s) {
   const xp = (s.totalKeys || 0) * 3 + (s.words || 0) * 10 + (s.bestStreak || 0) * 2;
   const level = 1 + Math.floor(xp / 250);
   const rank = RANKS[Math.min(RANKS.length - 1, level - 1)];
+  const totH = Math.max(1, (s.leftHand || 0) + (s.rightHand || 0));
+  const leftPct = Math.round(((s.leftHand || 0) * 100) / totH);
+
   const badges = [
     { name: 'First Steps (50+ keys)', ok: s.totalKeys >= 50 },
+    { name: 'Centurion (100+ keys)', ok: s.totalKeys >= 100 },
+    { name: 'Marathon Typist (500+ keys)', ok: s.totalKeys >= 500 },
+    { name: 'Iron Typist (1,500+ keys)', ok: s.totalKeys >= 1500 },
     { name: 'Speed Demon (60+ Peak WPM)', ok: s.wpmPeak >= 60 },
     { name: 'Hyper Velocity (100+ Peak WPM)', ok: s.wpmPeak >= 100 },
+    { name: 'Sonic Velocity (130+ Peak WPM)', ok: s.wpmPeak >= 130 },
     { name: 'Flawless Streak (100+ streak)', ok: s.bestStreak >= 100 },
-    { name: 'Marathon Runner (500+ keys)', ok: s.totalKeys >= 500 },
-    { name: 'Polyglot Coder (20+ digits/symbols)', ok: (s.digits + s.symbols) >= 20 }
+    { name: 'Zen Master (250+ streak)', ok: s.bestStreak >= 250 },
+    { name: 'Polyglot Coder (20+ digits/sym)', ok: (s.digits + s.symbols) >= 20 },
+    { name: 'Ambidextrous (45-55% balance)', ok: s.totalKeys >= 100 && leftPct >= 45 && leftPct <= 55 },
+    { name: 'Rhythm Virtuoso (<120ms latency)', ok: s.totalKeys >= 60 && s.avgLatMs > 0 && s.avgLatMs <= 120 }
   ];
   return { xp, level, rank, badges };
+}
+
+// Calculate Ergonomic Typing Strain Index (0 - 100%)
+function computeStrainIndex(s) {
+  if (!s || !s.totalKeys) return { score: 0, label: 'RELAXED', color: 'var(--green)' };
+  const totH = Math.max(1, (s.leftHand || 0) + (s.rightHand || 0));
+  const leftPct = Math.round(((s.leftHand || 0) * 100) / totH);
+  const handImbalance = Math.abs(leftPct - 50); // 0 to 50
+
+  const activeMin = (s.activeMs || 0) / 60000;
+  const timeFactor = Math.min(40, activeMin * 1.5);
+  const speedFactor = Math.min(30, (s.wpmNow || 0) * 0.3);
+  const balanceFactor = Math.min(30, handImbalance * 0.9);
+
+  const strain = Math.min(100, Math.round(timeFactor + speedFactor + balanceFactor));
+  let label = 'RELAXED';
+  let color = 'var(--green)';
+
+  if (strain >= 75) {
+    label = 'FATIGUE ALERT';
+    color = 'var(--red)';
+  } else if (strain >= 50) {
+    label = 'ELEVATED STRAIN';
+    color = 'var(--amber)';
+  } else if (strain >= 25) {
+    label = 'NOMINAL';
+    color = 'var(--cyan)';
+  }
+
+  return { score: strain, label, color };
 }
 
 function render(s) {
@@ -172,6 +400,24 @@ function render(s) {
   const { xp, level, rank, badges } = computeXPAndBadges(s);
   document.getElementById('hdrLevel').textContent = 'LVL ' + level;
   document.getElementById('hdrRank').textContent = rank;
+
+  // Dynamic Combo Multiplier Pill
+  const comboPill = document.getElementById('hdrCombo');
+  const comboTxt = document.getElementById('hdrComboTxt');
+  if (comboPill && comboTxt) {
+    const curStreak = s.curStreak || 0;
+    if (curStreak >= 10) {
+      comboPill.classList.remove('hidden');
+      let mult = '1.5x';
+      if (curStreak >= 100) mult = '10x GODLIKE';
+      else if (curStreak >= 50) mult = '5x ULTRA';
+      else if (curStreak >= 25) mult = '3x MEGA';
+      else if (curStreak >= 15) mult = '2x COMBO';
+      comboTxt.textContent = `${curStreak} STREAK · ${mult}`;
+    } else {
+      comboPill.classList.add('hidden');
+    }
+  }
 
   const stBadge = document.getElementById('hdrStatus');
   const stTxt = document.getElementById('hdrStatusTxt');
@@ -317,8 +563,20 @@ function render(s) {
   document.getElementById('erMinLat').textContent = s.minLatMs || 0;
   document.getElementById('erStreak').textContent = s.curStreak || 0;
   document.getElementById('erBestStreak').textContent = s.bestStreak || 0;
-  document.getElementById('erXP').textContent = xp;
   document.getElementById('erActiveTime').textContent = formatMMSS(Math.floor((s.activeMs || 0) / 1000));
+
+  // Strain Index
+  const strain = computeStrainIndex(s);
+  const erStrainEl = document.getElementById('erStrain');
+  const erStrainTxtEl = document.getElementById('erStrainTxt');
+  if (erStrainEl) {
+    erStrainEl.textContent = strain.score + '%';
+    erStrainEl.style.color = strain.color;
+  }
+  if (erStrainTxtEl) {
+    erStrainTxtEl.textContent = strain.label;
+    erStrainTxtEl.style.color = strain.color;
+  }
 
   const fBars = document.getElementById('fingerBars');
   fBars.innerHTML = '';
@@ -348,6 +606,15 @@ function render(s) {
 }
 
 // Typing Test Logic
+let ttModeIdx = 0;
+let ttSentIdx = 0;
+let ttTarget = TEST_SENTENCES.STANDARD[0];
+let ttTyped = '';
+let ttErrors = 0;
+let ttKeys = 0;
+let ttStart = 0;
+let ttDone = false;
+
 function resetTypingTest(nextSent = false) {
   const modeKey = MODE_KEYS[ttModeIdx];
   const list = TEST_SENTENCES[modeKey];
@@ -382,7 +649,7 @@ function renderTypingTest() {
     }
     box.appendChild(sp);
   }
-  const pct = Math.round((ttTyped.length * 100) / ttTarget.length);
+  const pct = Math.round((ttTyped.length * 100) / Math.max(1, ttTarget.length));
   document.getElementById('ttProg').style.width = pct + '%';
 
   const elapsedMs = ttStart > 0 ? Math.max(500, Date.now() - ttStart) : 0;
@@ -398,13 +665,368 @@ function renderTypingTest() {
   }
 }
 
+// Switch between the 5 Views
 function switchView(mode) {
   viewMode = mode;
   document.getElementById('viewDash').classList.toggle('hidden', mode !== 0);
   document.getElementById('viewTest').classList.toggle('hidden', mode !== 1);
   document.getElementById('viewErgo').classList.toggle('hidden', mode !== 2);
+  document.getElementById('viewArcade').classList.toggle('hidden', mode !== 3);
+  document.getElementById('viewZen').classList.toggle('hidden', mode !== 4);
+
+  // Update Navigation Tab Buttons
+  document.querySelectorAll('.nav-tab').forEach((t) => {
+    const m = parseInt(t.getAttribute('data-view'), 10);
+    t.classList.toggle('active', m === mode);
+  });
+
   document.getElementById('lblTest').textContent = mode === 1 ? 'Dash' : 'Test';
   if (mode === 1) resetTypingTest(false);
+  if (mode === 3 && !arcadeRunning) startArcadeGame();
+  if (mode === 4) analyzeZenText();
+}
+
+// ==========================================
+// VIEW 3: WORD BLITZ ARCADE GAME ENGINE
+// ==========================================
+let arcadeRunning = false;
+let arcadeScore = 0;
+let arcadeHighScore = 0;
+let arcadeShields = 3;
+let arcadeCombo = 1;
+let arcadeStreak = 0;
+let arcadeMaxCombo = 1;
+let arcadeWordsCleared = 0;
+let arcadeWave = 1;
+let arcadeActiveWords = [];
+let arcadeLastSpawn = 0;
+let arcadeTargetWordId = null;
+
+const ARCADE_VOCAB = {
+  chill: [
+    'cat', 'sun', 'sky', 'code', 'fast', 'play', 'game', 'type', 'wind', 'star',
+    'moon', 'fire', 'glow', 'jump', 'blue', 'pink', 'cool', 'zen', 'rain', 'gold'
+  ],
+  speed: [
+    'rocket', 'velocity', 'keyboard', 'terminal', 'cyberpunk', 'dashboard',
+    'blazing', 'lightning', 'analytics', 'telemetry', 'hardware', 'assembly',
+    'matrix', 'monitor', 'function', 'processor', 'overclock', 'quantum'
+  ],
+  hacker: [
+    'syscall', 'register', 'pointer', 'interrupt', 'bytecode', 'pipeline',
+    'overflow', 'payload', 'bitshift', 'debugger', 'deadlock', 'mutex',
+    'semaphore', 'coroutine', 'virtual', 'heuristic', 'cryptography', 'memory'
+  ]
+};
+
+function startArcadeGame() {
+  arcadeRunning = true;
+  arcadeScore = 0;
+  arcadeShields = 3;
+  arcadeCombo = 1;
+  arcadeStreak = 0;
+  arcadeMaxCombo = 1;
+  arcadeWordsCleared = 0;
+  arcadeWave = 1;
+  arcadeActiveWords = [];
+  arcadeTargetWordId = null;
+
+  try {
+    const savedHigh = localStorage.getItem('kpmArcadeHigh');
+    if (savedHigh) arcadeHighScore = parseInt(savedHigh, 10) || 0;
+  } catch (_) {}
+
+  document.getElementById('arcadePrompt').classList.add('hidden');
+  updateArcadeUI();
+  arcadeLoop();
+}
+
+function stopArcadeGame(isOver = true) {
+  arcadeRunning = false;
+  if (isOver) {
+    if (arcadeScore > arcadeHighScore) {
+      arcadeHighScore = arcadeScore;
+      try { localStorage.setItem('kpmArcadeHigh', String(arcadeHighScore)); } catch (_) {}
+      spawnConfetti();
+      showToast(`🏆 NEW ARCADE HIGH SCORE: ${arcadeScore} POINTS!`);
+    }
+    const prompt = document.getElementById('arcadePrompt');
+    if (prompt) {
+      prompt.classList.remove('hidden');
+      prompt.innerHTML = `
+        <div style="font-size:22px;font-weight:800;color:var(--red);margin-bottom:6px">GAME OVER</div>
+        <div style="color:#fff;font-size:14px;margin-bottom:8px">Final Score: <b>${arcadeScore}</b> · Words Cleared: <b>${arcadeWordsCleared}</b></div>
+        <button class="pill-btn green" id="btnArcadeReplay" style="padding:6px 14px;font-size:12px"><span>Play Again</span></button>
+      `;
+      document.getElementById('btnArcadeReplay').addEventListener('click', startArcadeGame);
+    }
+  }
+}
+
+function updateArcadeUI() {
+  const sh = document.getElementById('arcShields');
+  if (sh) sh.textContent = '❤️'.repeat(Math.max(0, arcadeShields));
+  const sc = document.getElementById('arcScore');
+  if (sc) sc.textContent = arcadeScore;
+  const hi = document.getElementById('arcHighScore');
+  if (hi) hi.textContent = arcadeHighScore;
+  const cb = document.getElementById('arcCombo');
+  if (cb) cb.textContent = arcadeCombo + 'x';
+  const wc = document.getElementById('arcWords');
+  if (wc) wc.textContent = arcadeWordsCleared;
+  const mc = document.getElementById('arcMaxCombo');
+  if (mc) mc.textContent = arcadeMaxCombo + 'x';
+  const wv = document.getElementById('arcWave');
+  if (wv) wv.textContent = arcadeWave;
+}
+
+function spawnArcadeWord() {
+  const diff = document.getElementById('selArcadeDiff').value || 'speed';
+  const list = ARCADE_VOCAB[diff] || ARCADE_VOCAB.speed;
+  const text = list[Math.floor(Math.random() * list.length)];
+  const arena = document.getElementById('arcadeArena');
+  const arenaW = arena.clientWidth || 700;
+
+  const id = 'w_' + Math.random().toString(36).substring(2, 9);
+  const el = document.createElement('div');
+  el.className = 'falling-word';
+  el.id = id;
+  el.innerHTML = `<span class="matched"></span><span class="remaining">${text}</span>`;
+
+  const spawnX = 20 + Math.random() * (arenaW - 140);
+  el.style.left = spawnX + 'px';
+  el.style.top = '-30px';
+  arena.appendChild(el);
+
+  const baseSpeed = diff === 'chill' ? 0.65 : (diff === 'speed' ? 1.05 : 1.35);
+  arcadeActiveWords.push({
+    id,
+    text,
+    typedLen: 0,
+    x: spawnX,
+    y: -30,
+    speed: baseSpeed + (arcadeWave * 0.08),
+    el
+  });
+}
+
+function arcadeLoop() {
+  if (!arcadeRunning || viewMode !== 3) return;
+  const now = Date.now();
+  const diff = document.getElementById('selArcadeDiff').value || 'speed';
+  const spawnRate = diff === 'chill' ? 2400 : (diff === 'speed' ? 1750 : 1300);
+
+  if (now - arcadeLastSpawn > spawnRate && arcadeActiveWords.length < 7) {
+    spawnArcadeWord();
+    arcadeLastSpawn = now;
+  }
+
+  const arenaH = 280; // danger threshold
+  for (let i = arcadeActiveWords.length - 1; i >= 0; i--) {
+    const w = arcadeActiveWords[i];
+    w.y += w.speed;
+    w.el.style.top = w.y + 'px';
+
+    if (w.y >= arenaH) {
+      // Hit danger line -> lose a shield!
+      w.el.remove();
+      arcadeActiveWords.splice(i, 1);
+      if (arcadeTargetWordId === w.id) arcadeTargetWordId = null;
+
+      arcadeShields--;
+      arcadeCombo = 1;
+      arcadeStreak = 0;
+      updateArcadeUI();
+
+      if (arcadeShields <= 0) {
+        stopArcadeGame(true);
+        return;
+      }
+    }
+  }
+
+  requestAnimationFrame(arcadeLoop);
+}
+
+function handleArcadeKey(key) {
+  if (!arcadeRunning || viewMode !== 3 || key.length !== 1) return;
+
+  // If already locked onto a target word
+  let target = arcadeActiveWords.find((w) => w.id === arcadeTargetWordId);
+  if (!target) {
+    // Find earliest falling word whose next letter matches
+    target = arcadeActiveWords.find((w) => w.text[w.typedLen] === key.toLowerCase());
+    if (target) {
+      arcadeTargetWordId = target.id;
+      arcadeActiveWords.forEach((w) => w.el.classList.remove('active-target'));
+      target.el.classList.add('active-target');
+    }
+  }
+
+  if (target && target.text[target.typedLen] === key.toLowerCase()) {
+    target.typedLen++;
+    const matched = target.text.slice(0, target.typedLen);
+    const rem = target.text.slice(target.typedLen);
+    target.el.innerHTML = `<span class="matched">${matched}</span><span class="remaining">${rem}</span>`;
+
+    // Visual sparks at word location
+    const rect = target.el.getBoundingClientRect();
+    spawnKeySparks(rect.left + 15, rect.top + 10, 'var(--gold)');
+
+    // Word destroyed!
+    if (target.typedLen >= target.text.length) {
+      spawnKeySparks(rect.left + rect.width / 2, rect.top, '#6EE7B7');
+      target.el.remove();
+      arcadeActiveWords = arcadeActiveWords.filter((w) => w.id !== target.id);
+      arcadeTargetWordId = null;
+
+      arcadeWordsCleared++;
+      arcadeStreak++;
+      if (arcadeStreak % 5 === 0) arcadeCombo = Math.min(10, arcadeCombo + 1);
+      if (arcadeCombo > arcadeMaxCombo) arcadeMaxCombo = arcadeCombo;
+
+      arcadeScore += target.text.length * 15 * arcadeCombo;
+      if (arcadeWordsCleared % 10 === 0) arcadeWave++;
+      updateArcadeUI();
+    }
+  }
+}
+
+// ==========================================
+// VIEW 4: ZEN SCRATCHPAD & LINGUISTICS LAB
+// ==========================================
+function countSyllables(word) {
+  word = word.toLowerCase().replace(/[^a-z]/g, '');
+  if (!word) return 0;
+  if (word.length <= 3) return 1;
+  word = word.replace(/(?:[^laeiouy]|ed|es|e)$/, '');
+  word = word.replace(/^y/, '');
+  const matches = word.match(/[aeiouy]{1,2}/g);
+  return matches ? matches.length : 1;
+}
+
+function analyzeZenText() {
+  const text = (document.getElementById('zenEditor').value || '').trim();
+  const charCount = text.length;
+  const words = text ? text.split(/\s+/).filter(Boolean) : [];
+  const wordCount = words.length;
+  const sentences = text ? (text.match(/[^.!?]+[.!?]+(\s|$)/g) || [text]).length : 1;
+
+  let totalSyllables = 0;
+  words.forEach((w) => { totalSyllables += countSyllables(w); });
+
+  // Flesch Reading Ease
+  let flesch = 100;
+  let grade = 1.0;
+  if (wordCount >= 3) {
+    const asl = wordCount / Math.max(1, sentences);
+    const asw = totalSyllables / Math.max(1, wordCount);
+    flesch = Math.max(0, Math.min(100, Math.round(206.835 - (1.015 * asl) - (84.6 * asw))));
+    grade = Math.max(1, Math.min(18, Math.round((0.39 * asl + 11.8 * asw - 15.59) * 10) / 10));
+  }
+
+  let verdict = 'Very Easy (Elementary)';
+  if (flesch < 30) verdict = 'Very Confusing (Graduate)';
+  else if (flesch < 50) verdict = 'Difficult (College)';
+  else if (flesch < 60) verdict = 'Fairly Difficult (High School)';
+  else if (flesch < 70) verdict = 'Plain English (8th-9th Grade)';
+  else if (flesch < 80) verdict = 'Fairly Easy (7th Grade)';
+  else if (flesch < 90) verdict = 'Easy (6th Grade)';
+
+  // Shannon Entropy
+  let entropy = 0;
+  if (charCount > 0) {
+    const counts = {};
+    for (const ch of text) counts[ch] = (counts[ch] || 0) + 1;
+    for (const cnt of Object.values(counts)) {
+      const p = cnt / charCount;
+      entropy -= p * Math.log2(p);
+    }
+  }
+
+  // Lexical Diversity (Type-Token Ratio)
+  const uniqueWords = new Set(words.map((w) => w.toLowerCase().replace(/[^a-z]/g, ''))).size;
+  const ttr = wordCount > 0 ? Math.round((uniqueWords * 100) / wordCount) : 100;
+
+  document.getElementById('zenCharCount').textContent = charCount;
+  document.getElementById('zenWordCount').textContent = wordCount;
+  document.getElementById('zenSentCount').textContent = sentences;
+  document.getElementById('zenSyllCount').textContent = totalSyllables;
+  document.getElementById('zenFleschScore').textContent = flesch;
+  document.getElementById('zenFleschVerdict').textContent = verdict;
+  document.getElementById('zenGradeLevel').textContent = grade.toFixed(1);
+  document.getElementById('zenEntropy').textContent = entropy.toFixed(2);
+  document.getElementById('zenEntropyVerdict').textContent = entropy > 4.5 ? 'High Randomness' : (entropy < 3.2 ? 'Repetitive' : 'Natural Text');
+  document.getElementById('zenTTR').textContent = ttr + '%';
+
+  // Read and Speech Times
+  const readSec = Math.round((wordCount / 200) * 60);
+  const speakSec = Math.round((wordCount / 130) * 60);
+  document.getElementById('zenReadTime').textContent = readSec < 60 ? readSec + 's' : Math.round(readSec / 60) + 'm';
+  document.getElementById('zenSpeakTime').textContent = speakSec < 60 ? speakSec + 's' : Math.round(speakSec / 60) + 'm';
+
+  // Auto-Detect Caesar Cipher using Chi-Squared
+  evaluateCaesarDecryption(text);
+}
+
+function evaluateCaesarDecryption(text) {
+  const letters = text.toLowerCase().replace(/[^a-z]/g, '');
+  if (letters.length < 8) {
+    document.getElementById('zenRotDetected').textContent = 'Auto: Need >8 letters';
+    document.getElementById('zenChiScore').textContent = 'Chi-Squared: -';
+    applyCaesarShift(parseInt(document.getElementById('zenRotSlider').value, 10) || 0);
+    return;
+  }
+
+  let bestShift = 0;
+  let minChi = Infinity;
+
+  for (let shift = 0; shift < 26; shift++) {
+    const rotated = {};
+    for (const ch of letters) {
+      const code = ((ch.charCodeAt(0) - 97 - shift + 26) % 26);
+      const decCh = String.fromCharCode(97 + code);
+      rotated[decCh] = (rotated[decCh] || 0) + 1;
+    }
+
+    let chi = 0;
+    for (let c = 0; c < 26; c++) {
+      const ch = String.fromCharCode(97 + c);
+      const obs = rotated[ch] || 0;
+      const exp = letters.length * (ENG_FREQ[ch] || 0.01);
+      chi += ((obs - exp) ** 2) / exp;
+    }
+
+    if (chi < minChi) {
+      minChi = chi;
+      bestShift = shift;
+    }
+  }
+
+  const chiScore = Math.round(minChi * 10) / 10;
+  document.getElementById('zenRotDetected').textContent = `Best: ROT ${bestShift} (Chi: ${chiScore})`;
+  document.getElementById('zenChiScore').textContent = `Chi-Squared: ${chiScore}`;
+
+  const curSliderVal = parseInt(document.getElementById('zenRotSlider').value, 10) || 0;
+  applyCaesarShift(curSliderVal);
+}
+
+function applyCaesarShift(shift) {
+  const text = document.getElementById('zenEditor').value || '';
+  document.getElementById('zenRotVal').textContent = `ROT ${shift}`;
+  let out = '';
+  for (const ch of text) {
+    const isUpper = ch >= 'A' && ch <= 'Z';
+    const isLower = ch >= 'a' && ch <= 'z';
+    if (isLower) {
+      out += String.fromCharCode(97 + ((ch.charCodeAt(0) - 97 - shift + 26) % 26));
+    } else if (isUpper) {
+      out += String.fromCharCode(65 + ((ch.charCodeAt(0) - 65 - shift + 26) % 26));
+    } else {
+      out += ch;
+    }
+  }
+  document.getElementById('zenDecodedPreview').textContent = out || 'Decoded text will appear here...';
 }
 
 // Export HTML, CSV and JSON reports
@@ -431,6 +1053,7 @@ function exportReports() {
 
 document.addEventListener('DOMContentLoaded', () => {
   initStaticDOM();
+  initFX();
   resetTypingTest(false);
 
   // If running as a standalone web app (e.g. on Render), show the "Get Chrome Extension (.zip)" button
@@ -438,6 +1061,26 @@ document.addEventListener('DOMContentLoaded', () => {
   const dlBtn = document.getElementById('btnDownloadExt');
   if (dlBtn && !isRealExtension) {
     dlBtn.style.display = 'inline-flex';
+  }
+
+  // Load sound profile preference
+  try {
+    const savedProf = localStorage.getItem('kpmSoundProfile');
+    if (savedProf) {
+      soundProfile = savedProf;
+      const sel = document.getElementById('selSoundProfile');
+      if (sel) sel.value = savedProf;
+    }
+  } catch (_) {}
+
+  const selProf = document.getElementById('selSoundProfile');
+  if (selProf) {
+    selProf.addEventListener('change', (e) => {
+      soundProfile = e.target.value;
+      try { localStorage.setItem('kpmSoundProfile', soundProfile); } catch (_) {}
+      playClickSound('A');
+      showToast('✓ Sound: ' + selProf.options[selProf.selectedIndex].text);
+    });
   }
 
   chrome.runtime.sendMessage({ type: 'KPM_GET_STATE' }, (res) => {
@@ -450,6 +1093,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     if (viewMode === 1 && ttStart > 0 && !ttDone) renderTypingTest();
   }, 300);
+
+  // View Navigation Tabs
+  document.querySelectorAll('.nav-tab').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      const mode = parseInt(tab.getAttribute('data-view'), 10);
+      switchView(mode);
+    });
+  });
 
   // Buttons
   function doResetAll() {
@@ -483,6 +1134,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  document.getElementById('btnArcade').addEventListener('click', () => {
+    switchView(viewMode === 3 ? 0 : 3);
+  });
+
   document.getElementById('btnTest').addEventListener('click', () => {
     switchView(viewMode === 1 ? 0 : 1);
   });
@@ -504,6 +1159,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const next = !(curState && curState.soundOn);
     chrome.runtime.sendMessage({ type: 'KPM_SET_PREFS', soundOn: next }, (res) => {
       if (res && res.state) render(res.state);
+      if (next) playClickSound('A');
       showToast(next ? '✓ Mechanical sound ON' : '✗ Mechanical sound OFF');
     });
   });
@@ -543,13 +1199,72 @@ document.addEventListener('DOMContentLoaded', () => {
     resetTypingTest(true);
   });
 
-  // Keyboard listener inside the extension popup/tab itself
+  // Custom Text Modal
+  const btnCustom = document.getElementById('btnCustomText');
+  const modalCustom = document.getElementById('modalCustomText');
+  const txtCustom = document.getElementById('txtCustomInput');
+  if (btnCustom && modalCustom) {
+    btnCustom.addEventListener('click', () => {
+      modalCustom.classList.remove('hidden');
+      txtCustom.focus();
+    });
+    document.getElementById('btnModalClose').addEventListener('click', () => modalCustom.classList.add('hidden'));
+    document.getElementById('btnModalCancel').addEventListener('click', () => modalCustom.classList.add('hidden'));
+    document.getElementById('modalBackdrop').addEventListener('click', () => modalCustom.classList.add('hidden'));
+    document.getElementById('btnModalSave').addEventListener('click', () => {
+      const val = txtCustom.value.trim();
+      if (val) {
+        TEST_SENTENCES.CUSTOM = [val];
+        ttModeIdx = MODE_KEYS.indexOf('CUSTOM');
+        ttSentIdx = 0;
+        resetTypingTest(false);
+      }
+      modalCustom.classList.add('hidden');
+    });
+  }
+
+  // Word Blitz Arcade Controls
+  const btnArcStart = document.getElementById('btnArcadeStart');
+  if (btnArcStart) btnArcStart.addEventListener('click', startArcadeGame);
+  const btnArcReset = document.getElementById('btnArcadeReset');
+  if (btnArcReset) btnArcReset.addEventListener('click', () => stopArcadeGame(false));
+
+  // Zen Scratchpad Events
+  const zenEditor = document.getElementById('zenEditor');
+  if (zenEditor) zenEditor.addEventListener('input', analyzeZenText);
+
+  const rotSlider = document.getElementById('zenRotSlider');
+  if (rotSlider) rotSlider.addEventListener('input', (e) => applyCaesarShift(parseInt(e.target.value, 10)));
+
+  const btnPangram = document.getElementById('btnZenPangram');
+  if (btnPangram) btnPangram.addEventListener('click', () => {
+    zenEditor.value = 'The quick brown fox jumps over the lazy dog. Pack my box with five dozen liquor jugs.';
+    analyzeZenText();
+  });
+  const btnQuote = document.getElementById('btnZenQuote');
+  if (btnQuote) btnQuote.addEventListener('click', () => {
+    zenEditor.value = 'Simplicity is prerequisite for reliability. Hardware eventually fails; software eventually works.';
+    analyzeZenText();
+  });
+  const btnRot = document.getElementById('btnZenRot');
+  if (btnRot) btnRot.addEventListener('click', () => {
+    zenEditor.value = 'Gur dhvpx oebja sbk whzcf bire gur ynml qbt (ROT-13 Cipher Text).';
+    analyzeZenText();
+  });
+  const btnClear = document.getElementById('btnZenClear');
+  if (btnClear) btnClear.addEventListener('click', () => {
+    zenEditor.value = '';
+    analyzeZenText();
+  });
+
+  // Global Keyboard listener inside the extension popup/tab itself
   window.addEventListener('keydown', (e) => {
     if (e.key === 'F1') { e.preventDefault(); document.getElementById('btnReset').click(); return; }
     if (e.key === 'F2') { e.preventDefault(); exportReports(); return; }
     if (e.key === 'F3') { e.preventDefault(); document.getElementById('btnPause').click(); return; }
-    if (e.key === 'F5') { e.preventDefault(); document.getElementById('btnTest').click(); return; }
-    if (e.key === 'F6') { e.preventDefault(); document.getElementById('btnErgo').click(); return; }
+    if (e.key === 'F4') { e.preventDefault(); switchView(viewMode === 3 ? 0 : 3); return; }
+    if (e.key === 'F5') { e.preventDefault(); switchView(viewMode === 1 ? 0 : 1); return; }
+    if (e.key === 'F6') { e.preventDefault(); switchView(viewMode === 2 ? 0 : 2); return; }
     if (e.key === 'F7') { e.preventDefault(); document.getElementById('btnTheme').click(); return; }
     if (e.key === 'F8') { e.preventDefault(); document.getElementById('btnSound').click(); return; }
 
@@ -563,12 +1278,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     playClickSound(e.key);
 
-    // Visual ripple on heatmap
+    // Visual ripple and sparks on heatmap
     const kId = e.key === ' ' ? 'SPC' : e.key.toUpperCase();
     const cap = document.getElementById('kcap_' + kId);
     if (cap) {
       cap.classList.add('ripple');
       setTimeout(() => cap.classList.remove('ripple'), 220);
+      const rect = cap.getBoundingClientRect();
+      spawnKeySparks(rect.left + rect.width / 2, rect.top + rect.height / 2, 'var(--cyan)');
+    }
+
+    // Arcade mode keystrokes
+    if (viewMode === 3 && arcadeRunning) {
+      handleArcadeKey(e.key);
     }
 
     // Send key to background state (in standalone web mode, content.js already records it)
@@ -606,11 +1328,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (ttTyped.length >= ttTarget.length) {
           ttDone = true;
           renderTypingTest();
+          spawnConfetti();
           const finalWpm = parseInt(document.getElementById('ttWpm').textContent, 10) || 0;
           chrome.runtime.sendMessage({ type: 'KPM_SET_PREFS', testBest: finalWpm }, (res) => {
             if (res && res.state) render(res.state);
           });
-          document.getElementById('ttStatus').innerHTML = `<b style="color:var(--green)">Sentence complete!</b> Speed: <b>${finalWpm} WPM</b> · Press <b>Enter</b> for the next sentence or <b>Tab</b> to switch category.`;
+          document.getElementById('ttStatus').innerHTML = `<b style="color:var(--green)">🎉 Sentence complete!</b> Speed: <b>${finalWpm} WPM</b> · Press <b>Enter</b> for the next sentence or <b>Tab</b> to switch category.`;
         } else {
           renderTypingTest();
         }

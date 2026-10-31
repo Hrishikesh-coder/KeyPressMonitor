@@ -98,8 +98,8 @@ NBTN              EQU 7           ; number of buttons (F4, F7, F8 are in the F9 
 ST_LASTN          EQU 6           ; self-test: last-N characters checked
 NSENT             EQU 12          ; typing test sentences (4 modes x 3)
 NMODES            EQU 4           ; typing test modes
-NTHEMES           EQU 4           ; colour themes
-NBADGES           EQU 6           ; unlockable achievements
+NTHEMES           EQU 8           ; colour themes
+NBADGES           EQU 8           ; unlockable achievements
 RIPPLE_MS         EQU 600         ; heatmap ripple length
 RIPPLE_STEP       EQU 70          ; ms for the ripple to move one key further
 STAT_N            EQU 12          ; DWORDs in KeyStats.dat

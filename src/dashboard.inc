@@ -1220,7 +1220,7 @@ de_rhy:
     invoke Num, eax, 21, xpScore, C_GOLD
     xor  esi, esi
 de_bloop:
-    cmp  esi, 6
+    cmp  esi, 8
     jae  de_done
     mov  eax, esi
     and  eax, 1

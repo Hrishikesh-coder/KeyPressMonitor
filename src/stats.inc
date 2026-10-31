@@ -96,7 +96,7 @@ TrackNgram ENDP
 ; ---- apply colour theme (themeIdx 0..3) ----
 ApplyTheme PROC USES esi edi
     mov  eax, themeIdx
-    and  eax, 3
+    and  eax, 7
     shl  eax, 5                     ; 8 DWORDs (32 bytes) per theme
     lea  esi, themeTable[eax]
     lea  edi, C_PAGE
@@ -153,8 +153,18 @@ ub_5:
     mov  eax, digits
     add  eax, symbols
     cmp  eax, 20
-    jb   ub_done
+    jb   ub_6
     or   ebx, 32
+    inc  ecx
+ub_6:
+    cmp  totalKeys, 1000
+    jb   ub_7
+    or   ebx, 64
+    inc  ecx
+ub_7:
+    cmp  bestStreak, 150
+    jb   ub_done
+    or   ebx, 128
     inc  ecx
 ub_done:
     mov  badgesMask, ebx
@@ -174,8 +184,22 @@ te_strk:
     inc  curStreak
     mov  eax, curStreak
     cmp  eax, bestStreak
-    jbe  te_lat
+    jbe  te_chkcombo
     mov  bestStreak, eax
+te_chkcombo:
+    cmp  curStreak, 25
+    jne  te_c50
+    invoke SetMsg, ADDR sMsgCombo25, C_GOLD
+    jmp  te_lat
+te_c50:
+    cmp  curStreak, 50
+    jne  te_c100
+    invoke SetMsg, ADDR sMsgCombo50, C_PINK
+    jmp  te_lat
+te_c100:
+    cmp  curStreak, 100
+    jne  te_lat
+    invoke SetMsg, ADDR sMsgCombo100, C_CYAN
 
 te_lat:                             ; 2. Inter-key latency & active time
     invoke GetTickCount

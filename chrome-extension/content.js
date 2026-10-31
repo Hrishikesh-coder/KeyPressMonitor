@@ -1,6 +1,6 @@
 // KeyPressMonitor — Content Script & Draggable / Resizable Floating Mini HUD
 // Captures real-time key presses across web pages (skipping password fields for privacy)
-// and displays a sleek, freely draggable and resizable floating HUD with 1-click Reset.
+// and displays a sleek, freely draggable and resizable floating HUD with 1-click Reset, Sound, and Combo meter.
 
 (function () {
   // Remove any stale HUD elements from previous extension reloads in this tab
@@ -59,7 +59,6 @@
 
   function createHud() {
     if (!isTopFrame || hudHost || !document.body) return;
-    // Ensure no duplicate exists in the DOM
     document.querySelectorAll('#kpm-floating-hud-host').forEach((el) => el.remove());
     hudHost = document.createElement('div');
     hudHost.id = 'kpm-floating-hud-host';
@@ -84,6 +83,7 @@
           font-size: 12px;
           min-width: 72px;
           box-sizing: border-box;
+          transition: border-color 0.2s, box-shadow 0.2s;
         }
         .hud.dragging {
           border-color: #67E8F9;
@@ -91,7 +91,7 @@
           cursor: grabbing !important;
         }
         .hud.hidden { display: none !important; }
-        .hud.minimized .stats, .hud.minimized .last-key, .hud.minimized .resize-grip { display: none; }
+        .hud.minimized .stats, .hud.minimized .last-key, .hud.minimized .resize-grip, .hud.minimized .hud-combo { display: none !important; }
         .drag-grip {
           cursor: grab;
           color: #64748B;
@@ -107,7 +107,7 @@
           gap: 5px;
           font-weight: 700;
           color: #fff;
-          cursor: grab;
+          cursor: pointer;
           padding-right: 6px;
           border-right: 1px solid #2A3352;
         }
@@ -136,6 +136,14 @@
         .v-vow { color: #6EE7B7; }
         .v-con { color: #FCD34D; }
         .v-strk { color: #4ADE80; }
+        .hud-combo {
+          color: #FACC15;
+          font-weight: 800;
+          padding: 1px 5px;
+          background: rgba(245, 158, 11, 0.2);
+          border-radius: 4px;
+          border: 1px solid rgba(245, 158, 11, 0.4);
+        }
         .last-key {
           background: #1C2238;
           border: 1px solid #2A3352;
@@ -179,7 +187,7 @@
       </style>
       <div class="hud" id="hudBox" title="Drag anywhere to move • Scroll wheel to zoom • Drag corner to resize">
         <div class="drag-grip" id="dragGrip" title="Drag to move HUD anywhere on screen">⋮⋮</div>
-        <div class="brand" id="btnToggleMin" title="Double-click to minimize/expand • Drag to move">
+        <div class="brand" id="btnBrand" title="Click to open Full Dashboard • Double-click to minimize">
           <span class="dot" id="hudDot"></span>
           <span>KP</span>
         </div>
@@ -188,11 +196,14 @@
           <span class="stat" title="Total Keys Pressed">Keys <b class="v-keys" id="hKeys">0</b></span>
           <span class="stat" title="Vowels / Consonants">V/C <b class="v-vow" id="hVow">0</b>/<b class="v-con" id="hCon">0</b></span>
           <span class="stat" title="Current Error-Free Streak">Streak <b class="v-strk" id="hStrk">0</b></span>
+          <span class="stat hud-combo" id="hCombo" style="display:none" title="Combo Multiplier">🔥 <b id="hComboTxt">10x</b></span>
         </div>
         <div class="last-key" id="hLast" title="Last Key Pressed">-</div>
         <div class="actions">
-          <button class="reset-btn" id="btnReset" title="Refresh / Clear all recorded stats (Reset to 0)">↻ Reset</button>
+          <button id="btnSound" title="Toggle mechanical switch click sound">🔊</button>
+          <button class="reset-btn" id="btnReset" title="Refresh / Clear all recorded stats (Reset to 0)">↻</button>
           <button id="btnPause" title="Pause / Resume tracking">⏸</button>
+          <button id="btnOpenDash" title="Open Full Analytics Dashboard in new tab">⛶</button>
           <button id="btnMin" title="Minimize / Expand HUD">_</button>
         </div>
         <div class="resize-grip" id="resizeGrip" title="Drag to resize / scale HUD (double-click to reset size)"></div>
@@ -209,9 +220,14 @@
       vow: shadow.getElementById('hVow'),
       con: shadow.getElementById('hCon'),
       strk: shadow.getElementById('hStrk'),
+      combo: shadow.getElementById('hCombo'),
+      comboTxt: shadow.getElementById('hComboTxt'),
       last: shadow.getElementById('hLast'),
+      btnSound: shadow.getElementById('btnSound'),
       btnPause: shadow.getElementById('btnPause'),
       btnMin: shadow.getElementById('btnMin'),
+      btnOpenDash: shadow.getElementById('btnOpenDash'),
+      btnBrand: shadow.getElementById('btnBrand'),
       resizeGrip: shadow.getElementById('resizeGrip')
     };
 
@@ -304,14 +320,42 @@
 
     // Minimize / Expand
     function toggleMinimize(e) {
-      e.stopPropagation();
+      if (e) e.stopPropagation();
       hudLayout.minimized = !hudLayout.minimized;
       hudRefs.btnMin.textContent = hudLayout.minimized ? '□' : '_';
       applyLayout();
       saveLayout();
     }
     hudRefs.btnMin.addEventListener('click', toggleMinimize);
-    shadow.getElementById('btnToggleMin').addEventListener('dblclick', toggleMinimize);
+    hudRefs.btnBrand.addEventListener('dblclick', toggleMinimize);
+
+    // Open Dashboard in Full Tab
+    function openDashboard(e) {
+      if (e) e.stopPropagation();
+      try {
+        chrome.runtime.sendMessage({ type: 'KPM_OPEN_DASH' });
+      } catch (_) {}
+    }
+    hudRefs.btnOpenDash.addEventListener('click', openDashboard);
+    hudRefs.btnBrand.addEventListener('click', (e) => {
+      if (e.detail === 1) {
+        // Single click: open dashboard
+        setTimeout(() => { if (!hudLayout.minimized) openDashboard(e); }, 200);
+      }
+    });
+
+    // Sound toggle directly from HUD
+    hudRefs.btnSound.addEventListener('click', (e) => {
+      e.stopPropagation();
+      try {
+        chrome.runtime.sendMessage({ type: 'KPM_GET_STATE' }, (res) => {
+          const next = !(res && res.state && res.state.soundOn);
+          chrome.runtime.sendMessage({ type: 'KPM_SET_PREFS', soundOn: next }, (r) => {
+            if (r && r.state) updateHud(r.state);
+          });
+        });
+      } catch (_) {}
+    });
 
     shadow.getElementById('btnReset').addEventListener('click', (e) => {
       e.stopPropagation();
@@ -344,12 +388,29 @@
     hudRefs.box.classList.remove('hidden');
     hudRefs.dot.className = 'dot' + (s.paused ? ' paused' : '');
     hudRefs.btnPause.textContent = s.paused ? '▶' : '⏸';
+    hudRefs.btnSound.textContent = s.soundOn ? '🔊' : '🔇';
     hudRefs.wpm.textContent = s.wpmNow || 0;
     hudRefs.keys.textContent = s.totalKeys || 0;
     hudRefs.vow.textContent = s.vowels || 0;
     hudRefs.con.textContent = s.consonants || 0;
     hudRefs.strk.textContent = s.curStreak || 0;
     hudRefs.last.textContent = s.lastKeyName || '-';
+
+    // Combo Pill in HUD
+    if (hudRefs.combo && hudRefs.comboTxt) {
+      const curStreak = s.curStreak || 0;
+      if (curStreak >= 10 && !hudLayout.minimized) {
+        hudRefs.combo.style.display = 'inline-block';
+        let mult = '1.5x';
+        if (curStreak >= 100) mult = '10x';
+        else if (curStreak >= 50) mult = '5x';
+        else if (curStreak >= 25) mult = '3x';
+        else if (curStreak >= 15) mult = '2x';
+        hudRefs.comboTxt.textContent = `${curStreak} (${mult})`;
+      } else {
+        hudRefs.combo.style.display = 'none';
+      }
+    }
   }
 
   // Initial state load

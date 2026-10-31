@@ -19,6 +19,7 @@ function defaultState() {
     hudOn: true,
     theme: 'midnight',
     soundOn: false,
+    soundProfile: 'blue',
     nView: 32,
     totalKeys: 0,
     vowels: 0,
@@ -282,10 +283,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     state.paused = !state.paused;
     saveState();
     sendResponse({ state });
+  } else if (msg.type === 'KPM_OPEN_DASH') {
+    if (chrome.tabs && chrome.tabs.create) {
+      chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') });
+    }
+    sendResponse({ ok: true });
   } else if (msg.type === 'KPM_SET_PREFS') {
     if (typeof msg.nView === 'number') state.nView = Math.max(8, Math.min(64, msg.nView));
     if (msg.theme) state.theme = msg.theme;
     if (typeof msg.soundOn === 'boolean') state.soundOn = msg.soundOn;
+    if (msg.soundProfile) state.soundProfile = msg.soundProfile;
     if (typeof msg.hudOn === 'boolean') state.hudOn = msg.hudOn;
     if (typeof msg.testBest === 'number') {
       if (msg.testBest > state.testBest) state.testBest = msg.testBest;

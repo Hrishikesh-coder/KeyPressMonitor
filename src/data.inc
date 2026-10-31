@@ -59,11 +59,15 @@ eng1000      DD 82, 15, 28, 43, 127, 22, 20, 61, 70, 2, 8, 40, 24
 stdOut       DD 0                 ; self-test output handle
 stLastOk     DD 0                 ; self-test: last-N view correct
 
-; 4 themes x 8 colours: PAGE, PANEL, BORDER, TRACK, AXIS, OFFKEY, HDR1, HDR2
+; 8 themes x 8 colours: PAGE, PANEL, BORDER, TRACK, AXIS, OFFKEY, HDR1, HDR2
 themeTable   DD 01A0E0Bh, 0291712h, 052332Ah, 038221Ch, 0452A23h, 040261Fh, 04B1B1Eh, 0B6215Bh ; Midnight
              DD 01A0614h, 02E0B24h, 07A1C5Ch, 03D1030h, 0561644h, 04A123Bh, 06B0F4Ch, 0B000FFh ; Cyberpunk
              DD 0081408h, 00D220Dh, 01E4D1Eh, 0122E12h, 0173B17h, 0143314h, 00F380Fh, 01E7A1Eh ; Matrix
              DD 040342Eh, 052423Bh, 06A564Ch, 0493B34h, 05E4C43h, 056463Eh, 0755E4Ch, 0A1815Eh ; Nord
+             DD 0362A28h, 0291F1Eh, 0A47262h, 0463734h, 05A4744h, 02C2221h, 05A4744h, 0F993BDh ; Dracula
+             DD 0281018h, 03B1626h, 07D2779h, 04D1C39h, 0692559h, 0451433h, 0661B6Ah, 07E5EFFh ; Synthwave
+             DD 0362B00h, 0423607h, 0756E58h, 04A3D0Bh, 0D28B26h, 03F3409h, 0423607h, 098A12Ah ; Solarized
+             DD 0020C12h, 0041520h, 00A4870h, 0061D2Ch, 009334Dh, 0051926h, 0042840h, 00677D9h ; Amber CRT
 
 hIn          DD ?
 hOut         DD ?
@@ -354,7 +358,15 @@ sMsgTheme0   DB 0FBh, " Theme: Midnight", 0
 sMsgTheme1   DB 0FBh, " Theme: Cyberpunk Neon", 0
 sMsgTheme2   DB 0FBh, " Theme: Matrix Hacker", 0
 sMsgTheme3   DB 0FBh, " Theme: Nord Frost", 0
+sMsgTheme4   DB 0FBh, " Theme: Dracula", 0
+sMsgTheme5   DB 0FBh, " Theme: Synthwave", 0
+sMsgTheme6   DB 0FBh, " Theme: Solarized", 0
+sMsgTheme7   DB 0FBh, " Theme: Amber CRT", 0
 themeMsgs    DD OFFSET sMsgTheme0, OFFSET sMsgTheme1, OFFSET sMsgTheme2, OFFSET sMsgTheme3
+             DD OFFSET sMsgTheme4, OFFSET sMsgTheme5, OFFSET sMsgTheme6, OFFSET sMsgTheme7
+sMsgCombo25  DB 0FBh, " 25x Streak! On Fire!", 0
+sMsgCombo50  DB 0FBh, " 50x Ultra Combo! Blazing Fast!", 0
+sMsgCombo100 DB 0FBh, " 100x Godlike Flawless Streak!", 0
 sMsgSndOn    DB 0FBh, " Mechanical key sound ON (F8)", 0
 sMsgSndOff   DB "x Mechanical key sound OFF (F8)", 0
 sCsvFile     DB "KeyReport.csv", 0
@@ -489,7 +501,9 @@ sBdg2        DB "Hyper Velocity (100+ Peak WPM)", 0
 sBdg3        DB "Flawless Streak (100+ streak)", 0
 sBdg4        DB "Marathon Runner (500+ keys)", 0
 sBdg5        DB "Polyglot Coder (20+ symbols/digits)", 0
-badgeNames   DD OFFSET sBdg0, OFFSET sBdg1, OFFSET sBdg2, OFFSET sBdg3, OFFSET sBdg4, OFFSET sBdg5
+sBdg6        DB "Centurion Typist (1000+ keys)", 0
+sBdg7        DB "Iron Rhythm (150+ streak)", 0
+badgeNames   DD OFFSET sBdg0, OFFSET sBdg1, OFFSET sBdg2, OFFSET sBdg3, OFFSET sBdg4, OFFSET sBdg5, OFFSET sBdg6, OFFSET sBdg7
 sXpLbl       DB "XP ", 0
 sUnlocked    DB "[UNLOCKED]", 0
 sLocked      DB "[LOCKED]  ", 0

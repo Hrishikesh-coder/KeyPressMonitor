@@ -279,7 +279,7 @@ da_theme:
     jne  da_help
     mov  eax, themeIdx
     inc  eax
-    and  eax, 3
+    and  eax, 7
     mov  themeIdx, eax
     invoke ApplyTheme
     mov  eax, themeIdx
