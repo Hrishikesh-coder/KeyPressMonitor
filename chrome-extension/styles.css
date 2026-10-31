@@ -735,3 +735,120 @@ body {
   backdrop-filter: blur(4px);
   z-index: 9999;
 }
+
+/* Volume & Interactive Additions */
+.vol-wrap {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  font-size: 11px;
+}
+.vol-slider {
+  width: 52px;
+  height: 4px;
+  accent-color: var(--cyan);
+  cursor: pointer;
+}
+.floating-score {
+  position: absolute;
+  font-family: 'Consolas', monospace;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--gold);
+  text-shadow: 0 0 10px rgba(250, 204, 21, 0.8);
+  pointer-events: none;
+  animation: floatUp 0.85s ease-out forwards;
+  z-index: 50;
+}
+@keyframes floatUp {
+  0% { transform: translateY(0) scale(1); opacity: 1; }
+  100% { transform: translateY(-40px) scale(1.2); opacity: 0; }
+}
+.shake {
+  animation: arenaShake 0.35s cubic-bezier(.36,.07,.19,.97) both;
+}
+@keyframes arenaShake {
+  10%, 90% { transform: translate3d(-3px, 0, 0); }
+  20%, 80% { transform: translate3d(5px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-5px, 0, 0); }
+  40%, 60% { transform: translate3d(5px, 0, 0); }
+}
+.key-detail-toast {
+  position: fixed;
+  bottom: 45px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--panel);
+  border: 1px solid var(--cyan);
+  color: #fff;
+  padding: 4px 14px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-family: 'Consolas', monospace;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.55);
+  z-index: 1000;
+  pointer-events: none;
+  animation: toastFade 1.6s forwards;
+}
+@keyframes toastFade {
+  0% { opacity: 0; transform: translate(-50%, 8px); }
+  15% { opacity: 1; transform: translate(-50%, 0); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -6px); }
+}
+
+/* Animated Audio Equalizer */
+.audio-eq {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 12px;
+  width: 13px;
+  vertical-align: middle;
+  margin-left: 2px;
+}
+.audio-eq span {
+  width: 3px;
+  background: var(--cyan);
+  border-radius: 1px;
+  height: 3px;
+  transition: height 0.08s ease;
+}
+.audio-eq.playing span:nth-child(1) {
+  animation: eqBounce1 0.22s infinite alternate ease-in-out;
+}
+.audio-eq.playing span:nth-child(2) {
+  animation: eqBounce2 0.3s infinite alternate ease-in-out;
+}
+.audio-eq.playing span:nth-child(3) {
+  animation: eqBounce3 0.18s infinite alternate ease-in-out;
+}
+@keyframes eqBounce1 { from { height: 2px; } to { height: 12px; } }
+@keyframes eqBounce2 { from { height: 3px; } to { height: 9px; } }
+@keyframes eqBounce3 { from { height: 2px; } to { height: 11px; } }
+
+/* Blinking Neon Ghost Cursor for Typing Test */
+.tt-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 18px;
+  background: var(--cyan);
+  vertical-align: text-bottom;
+  box-shadow: 0 0 8px var(--cyan);
+  animation: cursorBlink 0.9s infinite;
+  margin: 0 1px;
+}
+@keyframes cursorBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* Finger Heatmap Keycap Legend Badges */
+.keycap.finger-mode {
+  transition: transform 0.15s, box-shadow 0.15s, background 0.2s;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+}

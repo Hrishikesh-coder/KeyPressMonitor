@@ -74,9 +74,23 @@
     };
   }
 
+  const memStore = {};
+  function safeGetItem(k) {
+    try {
+      if (typeof localStorage !== 'undefined') return localStorage.getItem(k);
+    } catch (_) {}
+    return memStore[k] || null;
+  }
+  function safeSetItem(k, v) {
+    memStore[k] = v;
+    try {
+      if (typeof localStorage !== 'undefined') localStorage.setItem(k, v);
+    } catch (_) {}
+  }
+
   let state = defaultState();
   try {
-    const saved = localStorage.getItem('kpmState');
+    const saved = safeGetItem('kpmState');
     if (saved) state = Object.assign(defaultState(), JSON.parse(saved));
   } catch (_) {}
 
@@ -84,7 +98,7 @@
 
   function saveState() {
     try {
-      localStorage.setItem('kpmState', JSON.stringify(state));
+      safeSetItem('kpmState', JSON.stringify(state));
       changeListeners.forEach((fn) => {
         try { fn({ kpmState: { newValue: state } }, 'local'); } catch (_) {}
       });
@@ -104,10 +118,18 @@
     }
   }
 
+  let lastPolyKey = '';
+  let lastPolyTime = 0;
+
   function recordKeyEvent(payload) {
     if (state.paused) return state;
     const now = Date.now();
-    const key = payload.key || '';
+    const key = (payload && payload.key) || '';
+    if (key && key === lastPolyKey && (now - lastPolyTime) < 25) {
+      return state;
+    }
+    lastPolyKey = key;
+    lastPolyTime = now;
 
     state.totalKeys++;
     state.tsRing.push(now);
@@ -283,7 +305,7 @@
           const out = {};
           (Array.isArray(keys) ? keys : [keys]).forEach((k) => {
             try {
-              const v = localStorage.getItem(k);
+              const v = safeGetItem(k);
               if (v) out[k] = JSON.parse(v);
             } catch (_) {}
           });
@@ -291,7 +313,7 @@
         },
         set: (obj, cb) => {
           Object.entries(obj || {}).forEach(([k, v]) => {
-            try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {}
+            try { safeSetItem(k, JSON.stringify(v)); } catch (_) {}
           });
           if (cb) cb();
         }

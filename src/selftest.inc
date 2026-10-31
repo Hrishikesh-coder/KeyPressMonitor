@@ -49,6 +49,14 @@ ch_no:
     ret
 CmdHas ENDP
 
+; ---- display CLI help manual ----
+ShowCliHelp PROC
+    invoke GetStdHandle, STD_OUTPUT_HANDLE
+    mov  stdOut, eax
+    invoke StOut, ADDR sCliHelpText
+    ret
+ShowCliHelp ENDP
+
 ; ---- run the self-test; eax = number of failed checks ----
 RunSelfTest PROC USES ebx esi edi
     LOCAL fails:DWORD, passes:DWORD

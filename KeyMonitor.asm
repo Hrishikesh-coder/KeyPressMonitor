@@ -90,15 +90,46 @@ start:
     jnz  selfTest
     invoke CmdHas, ADDR sSelfArg2
     test eax, eax
-    jz   normalStart
+    jnz  selfTest
+    invoke CmdHas, ADDR sHelpArg1   ; /help
+    test eax, eax
+    jnz  showHelp
+    invoke CmdHas, ADDR sHelpArg2   ; -help
+    test eax, eax
+    jnz  showHelp
+    invoke CmdHas, ADDR sHelpArg3   ; /?
+    test eax, eax
+    jnz  showHelp
+    invoke CmdHas, ADDR sHelpArg4   ; --help
+    test eax, eax
+    jnz  showHelp
+    invoke CmdHas, ADDR sHelpArg5   ; -h
+    test eax, eax
+    jnz  showHelp
+    invoke CmdHas, ADDR sVerArg     ; /version
+    test eax, eax
+    jnz  showHelp
+    jmp  normalStart
 selfTest:
     invoke RunSelfTest
     invoke ExitProcess, eax         ; exit code = number of failed checks
+showHelp:
+    invoke ShowCliHelp
+    invoke ExitProcess, 0
+
 normalStart:
     invoke GetStdHandle, STD_INPUT_HANDLE
     mov  hIn, eax
     invoke GetStdHandle, STD_OUTPUT_HANDLE
     mov  hOut, eax
+    cmp  hIn, -1
+    je   errHandles
+    cmp  hIn, 0
+    je   errHandles
+    cmp  hOut, -1
+    je   errHandles
+    cmp  hOut, 0
+    je   errHandles
     invoke GetConsoleMode, hIn, ADDR oldInMode
     invoke SetConsoleMode, hIn, IN_MODE
     invoke GetConsoleOutputCP
@@ -182,4 +213,7 @@ waitKey:
     cmp  DWORD PTR inRec+4, 0
     je   waitKey
     invoke ExitProcess, 0
+
+errHandles:
+    invoke ExitProcess, 1
 end start

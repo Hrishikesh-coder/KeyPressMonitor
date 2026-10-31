@@ -119,10 +119,18 @@ function updateLiveWpm(now) {
   }
 }
 
+let lastRecordKey = '';
+let lastRecordTime = 0;
+
 function recordKeyEvent(payload) {
   if (state.paused) return state;
   const now = Date.now();
-  const key = payload.key || '';
+  const key = (payload && payload.key) || '';
+  if (key && key === lastRecordKey && (now - lastRecordTime) < 25) {
+    return state;
+  }
+  lastRecordKey = key;
+  lastRecordTime = now;
 
   state.totalKeys++;
   state.tsRing.push(now);

@@ -52,8 +52,8 @@ Type anywhere in the console (or across any webpage with the Chrome Extension) a
 | Ghost race | The typing test keeps your best run of each sentence (`KeyGhost.dat`): a ▲ ghost marker moves under the sentence at your old pace, with "you are N chars ahead/behind", and the result says whether you beat it |
 | Heatmap modes (Up / Down) | The keyboard heatmap switches between **frequency**, **speed** (average ms to reach each key; slow keys are hot) and **test misses** (keys you got wrong in the typing test). Click the heatmap to cycle too |
 | Text analysis (F6 twice) | Shannon entropy of your letters (bits/letter), % overlap with English letter shares, a chi-squared test against English (df 25), and the Caesar shift that makes the text most English-like (it decodes ROT-n). Computed on the x87 FPU (`FYL2X` for log2), also in both reports |
-| Self-test (`/selftest`) | `KeyMonitor.exe /selftest` types a known sentence through the real counting code and checks 15 results (vowels, consonants, frequency, last N, words, n-grams...). Prints PASS/FAIL and exits with the number of failures; CI runs it on every push |
-| Chrome Extension (Manifest V3) | Full browser extension in `chrome-extension/` with popup & full-tab dashboard, live webpage keystroke telemetry, 5 views (Dashboard, Typing Test, Biomechanics & Fatigue, Word Blitz Arcade, Zen & Crypto Lab), 8 themes, 5 switch sound profiles, particle sparks, and JSON/CSV export |
+| Self-test & CLI flags (`/selftest`, `/help`) | `KeyMonitor.exe /selftest` runs a 19-point automated validation suite. `KeyMonitor.exe /help` or `/?` displays full CLI documentation and hotkey guide without disturbing console buffers |
+| Chrome Extension (Manifest V3) | Full browser extension in `chrome-extension/` with popup & full-tab dashboard, live webpage telemetry, 5 views (Dashboard, Typing Test, Biomechanics & Fatigue, Word Blitz Arcade, Zen & Crypto Lab), 8 themes, 5 switch sound profiles, interactive ANSI 10-finger heatmap, laser cannon VFX, animated sound equalizer, and JSON/CSV export |
 
 ## Controls
 

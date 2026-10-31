@@ -696,6 +696,42 @@ sHUpDn       DB "Heatmap: often/speed/miss", 0
 ; ---- self-test (KeyMonitor.exe /selftest) ----
 sSelfArg1    DB "/selftest", 0
 sSelfArg2    DB "-selftest", 0
+
+sHelpArg1    DB "/help", 0
+sHelpArg2    DB "-help", 0
+sHelpArg3    DB "/?", 0
+sHelpArg4    DB "--help", 0
+sHelpArg5    DB "-h", 0
+sVerArg      DB "/version", 0
+sErrHandle   DB "KeyMonitor: Error acquiring standard console handles.", 13, 10, 0
+sCliHelpText DB "=================================================================", 13, 10
+             DB " KeyPressMonitor v2.4 (x86 MASM 32-bit Assembly & VT Engine)", 13, 10
+             DB " High-Performance Real-Time Keystroke Telemetry & Biomechanics", 13, 10
+             DB "=================================================================", 13, 10, 13, 10
+             DB "USAGE:", 13, 10
+             DB "  KeyMonitor.exe [options]", 13, 10, 13, 10
+             DB "OPTIONS:", 13, 10
+             DB "  (none)      Launch full-screen real-time interactive dashboard", 13, 10
+             DB "  /selftest   Run automated 19-point regression self-test suite", 13, 10
+             DB "  -selftest   Alternative flag for automated self-test", 13, 10
+             DB "  /help, -h   Display this command-line manual and exit", 13, 10
+             DB "  /?, --help  Display this command-line manual and exit", 13, 10
+             DB "  /version    Display version, build specifications, and exit", 13, 10, 13, 10
+             DB "HOTKEYS (Interactive GUI Mode):", 13, 10
+             DB "  F1          Reset all session counters and history buffers", 13, 10
+             DB "  F2          Export comprehensive HTML / CSV / JSON reports", 13, 10
+             DB "  F3          Pause / Resume real-time tracking", 13, 10
+             DB "  F4          Toggle automatic report generation on exit", 13, 10
+             DB "  F5          Typing Speed Test (live WPM, accuracy, ghost race)", 13, 10
+             DB "  F6          Ergonomics & Biomechanics (finger load, strain)", 13, 10
+             DB "  F7          Cycle 8 Color Themes (Midnight, Cyberpunk, Dracula, etc.)", 13, 10
+             DB "  F8          Toggle Mechanical Key Sound synthesis (PC Beep)", 13, 10
+             DB "  F9          Toggle in-depth Help Overlay", 13, 10
+             DB "  F10         Interactive Keystroke Session Replay", 13, 10
+             DB "  Up / Down   Cycle Heatmap display modes (Freq / Speed / Misses)", 13, 10
+             DB "  Left/Right  Adjust last-N buffer display size", 13, 10
+             DB "  ESC         Save session state and cleanly exit", 13, 10, 0
+
 stInput      DB "The quick brown fox jumps over the lazy dog. Pack 5 boxes, then the end!", 8, 13, 0
 stLastExp    DB "end!", 0AEh, 0D9h          ; last N glyphs: Backspace, Enter
 stTitle      DB "KeyMonitor self-test", 13, 10, "--------------------", 13, 10, 0

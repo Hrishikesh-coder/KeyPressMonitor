@@ -35,6 +35,12 @@
         <option value="scifi">Switch: Sci-Fi Blaster</option>
       </select>
 
+      <div class="vol-wrap" title="Mechanical switch click volume">
+        <span id="volIcon">🔊</span>
+        <input type="range" id="rngVolume" class="vol-slider" min="0" max="100" step="5" value="70">
+        <div class="audio-eq" id="audioEq" title="Audio Activity"><span></span><span></span><span></span></div>
+      </div>
+
       <div class="xp-pill">
         <span class="xp-lvl" id="hdrLevel">LVL 1</span>
         <span class="xp-rank" id="hdrRank">NOVICE</span>
@@ -149,7 +155,14 @@
           <div class="panel">
             <div class="panel-hdr">
               <span>KEYBOARD HEATMAP</span>
-              <span class="muted">cold 🟦🟩🟨🟧🟥 hot</span>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span class="muted" id="heatLegend">cold 🟦🟩🟨🟧🟥 hot</span>
+                <select class="n-btn" id="selHeatMode" style="padding:1px 6px;font-size:10px" title="Change heatmap visualization">
+                  <option value="freq">🔥 Frequency</option>
+                  <option value="fingers">✋ Finger Map</option>
+                  <option value="errors">⚠️ Missed Keys</option>
+                </select>
+              </div>
             </div>
             <div class="kb-wrap" id="kbWrap"></div>
           </div>
@@ -200,12 +213,17 @@
           <div style="display:flex;gap:6px">
             <button class="n-btn" id="btnCustomText">✏️ Custom Text</button>
             <button class="n-btn" id="btnCycleMode">Tab: Change Mode</button>
+            <button class="n-btn" id="btnRestartSent">🔄 Restart</button>
             <button class="n-btn" id="btnNextSent">Enter: Next Sentence</button>
           </div>
         </div>
         <div class="test-sentence" id="ttSentence"></div>
         <div class="mix-bar" style="height:6px;margin-top:8px">
           <div class="mix-v" id="ttProg" style="width:0%;background:var(--cyan)"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:6px">
+          <span>Live Accuracy: <b id="ttAccLive" style="color:var(--green)">100%</b> · Pacing: <b id="ttPacing" style="color:var(--cyan)">Ready</b></span>
+          <span id="ttProgTxt">0 / 0 chars</span>
         </div>
       </div>
 
@@ -287,6 +305,7 @@
         </div>
         <div style="display:flex;gap:6px">
           <button class="pill-btn green" id="btnArcadeStart"><span>▶ Start Game</span></button>
+          <button class="pill-btn gold" id="btnArcadePause" style="display:none"><span>⏸️ Pause</span></button>
           <button class="pill-btn red" id="btnArcadeReset"><span>↺ Reset</span></button>
         </div>
       </div>
@@ -319,6 +338,7 @@
                 <button class="n-btn" id="btnZenQuote">Quote</button>
                 <button class="n-btn" id="btnZenRot">ROT-13 Sample</button>
                 <button class="n-btn" id="btnZenClear">Clear</button>
+                <button class="n-btn" id="btnZenCopy">📋 Copy</button>
               </div>
             </div>
             <textarea class="zen-editor" id="zenEditor" placeholder="Type or paste any text here to watch real-time readability, Shannon entropy and Caesar cipher analytics..."></textarea>
@@ -334,7 +354,11 @@
                 <span>Shift Amount: <b id="zenRotVal" style="color:var(--cyan)">ROT 0</b></span>
                 <span class="muted" id="zenChiScore">Chi-Squared: 0.0</span>
               </div>
-              <input type="range" min="0" max="25" value="0" class="rot-slider" id="zenRotSlider">
+              <div style="display:flex;align-items:center;gap:6px">
+                <button class="n-btn" id="btnRotDec" style="padding:1px 6px">◀</button>
+                <input type="range" min="0" max="25" value="0" class="rot-slider" id="zenRotSlider" style="flex:1">
+                <button class="n-btn" id="btnRotInc" style="padding:1px 6px">▶</button>
+              </div>
               <div style="font-size:11px;color:var(--muted);margin-top:6px;word-break:break-all" id="zenDecodedPreview">Decoded text will appear here...</div>
             </div>
           </div>
@@ -425,6 +449,5 @@
 
   <script src="web-polyfill.js"></script>
   <script src="dashboard.js"></script>
-  <script src="content.js"></script>
 </body>
 </html>

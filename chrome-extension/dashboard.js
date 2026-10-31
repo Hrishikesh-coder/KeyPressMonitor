@@ -67,9 +67,82 @@ let curState = null;
 let viewMode = 0; // 0=Dash, 1=Test, 2=Ergo, 3=Arcade, 4=Zen
 let audioCtx = null;
 let soundProfile = 'blue';
+let soundVolume = 0.7;
+let heatMode = 'freq'; // 'freq', 'fingers', 'errors'
+let missedKeysMap = {};
 
-// Particle FX Engine
+// Ergonomic ANSI 10-Finger Color Map
+const FINGER_MAP = {
+  '1': { finger: 'L.Pinky', color: 'rgba(248, 113, 113, 0.45)' },
+  'Q': { finger: 'L.Pinky', color: 'rgba(248, 113, 113, 0.45)' },
+  'A': { finger: 'L.Pinky', color: 'rgba(248, 113, 113, 0.45)' },
+  'Z': { finger: 'L.Pinky', color: 'rgba(248, 113, 113, 0.45)' },
+
+  '2': { finger: 'L.Ring', color: 'rgba(251, 146, 60, 0.45)' },
+  'W': { finger: 'L.Ring', color: 'rgba(251, 146, 60, 0.45)' },
+  'S': { finger: 'L.Ring', color: 'rgba(251, 146, 60, 0.45)' },
+  'X': { finger: 'L.Ring', color: 'rgba(251, 146, 60, 0.45)' },
+
+  '3': { finger: 'L.Middle', color: 'rgba(250, 204, 21, 0.45)' },
+  'E': { finger: 'L.Middle', color: 'rgba(250, 204, 21, 0.45)' },
+  'D': { finger: 'L.Middle', color: 'rgba(250, 204, 21, 0.45)' },
+  'C': { finger: 'L.Middle', color: 'rgba(250, 204, 21, 0.45)' },
+
+  '4': { finger: 'L.Index', color: 'rgba(74, 222, 128, 0.45)' },
+  '5': { finger: 'L.Index', color: 'rgba(74, 222, 128, 0.45)' },
+  'R': { finger: 'L.Index', color: 'rgba(74, 222, 128, 0.45)' },
+  'T': { finger: 'L.Index', color: 'rgba(74, 222, 128, 0.45)' },
+  'F': { finger: 'L.Index', color: 'rgba(74, 222, 128, 0.45)' },
+  'G': { finger: 'L.Index', color: 'rgba(74, 222, 128, 0.45)' },
+  'V': { finger: 'L.Index', color: 'rgba(74, 222, 128, 0.45)' },
+  'B': { finger: 'L.Index', color: 'rgba(74, 222, 128, 0.45)' },
+
+  'SPC': { finger: 'Thumbs', color: 'rgba(56, 189, 248, 0.45)' },
+
+  '6': { finger: 'R.Index', color: 'rgba(167, 139, 250, 0.45)' },
+  '7': { finger: 'R.Index', color: 'rgba(167, 139, 250, 0.45)' },
+  'Y': { finger: 'R.Index', color: 'rgba(167, 139, 250, 0.45)' },
+  'U': { finger: 'R.Index', color: 'rgba(167, 139, 250, 0.45)' },
+  'H': { finger: 'R.Index', color: 'rgba(167, 139, 250, 0.45)' },
+  'J': { finger: 'R.Index', color: 'rgba(167, 139, 250, 0.45)' },
+  'N': { finger: 'R.Index', color: 'rgba(167, 139, 250, 0.45)' },
+  'M': { finger: 'R.Index', color: 'rgba(167, 139, 250, 0.45)' },
+
+  '8': { finger: 'R.Middle', color: 'rgba(244, 114, 182, 0.45)' },
+  'I': { finger: 'R.Middle', color: 'rgba(244, 114, 182, 0.45)' },
+  'K': { finger: 'R.Middle', color: 'rgba(244, 114, 182, 0.45)' },
+  ',': { finger: 'R.Middle', color: 'rgba(244, 114, 182, 0.45)' },
+
+  '9': { finger: 'R.Ring', color: 'rgba(96, 165, 250, 0.45)' },
+  'O': { finger: 'R.Ring', color: 'rgba(96, 165, 250, 0.45)' },
+  'L': { finger: 'R.Ring', color: 'rgba(96, 165, 250, 0.45)' },
+  '.': { finger: 'R.Ring', color: 'rgba(96, 165, 250, 0.45)' },
+
+  '0': { finger: 'R.Pinky', color: 'rgba(192, 132, 252, 0.45)' },
+  '-': { finger: 'R.Pinky', color: 'rgba(192, 132, 252, 0.45)' },
+  '=': { finger: 'R.Pinky', color: 'rgba(192, 132, 252, 0.45)' },
+  'P': { finger: 'R.Pinky', color: 'rgba(192, 132, 252, 0.45)' },
+  '[': { finger: 'R.Pinky', color: 'rgba(192, 132, 252, 0.45)' },
+  ']': { finger: 'R.Pinky', color: 'rgba(192, 132, 252, 0.45)' },
+  ';': { finger: 'R.Pinky', color: 'rgba(192, 132, 252, 0.45)' },
+  "'": { finger: 'R.Pinky', color: 'rgba(192, 132, 252, 0.45)' },
+  '/': { finger: 'R.Pinky', color: 'rgba(192, 132, 252, 0.45)' }
+};
+
+// Resilient Web Audio context retrieval
+function getAudioContext() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(() => {});
+    }
+  } catch (_) {}
+  return audioCtx;
+}
+
+// Particle & Laser FX Engine
 let fxParticles = [];
+let fxBeams = [];
 let fxAnimFrame = null;
 
 function initFX() {
@@ -114,9 +187,40 @@ function initFX() {
       }
       ctx.restore();
     }
+
+    for (let i = fxBeams.length - 1; i >= 0; i--) {
+      const b = fxBeams[i];
+      b.alpha -= b.fade || 0.07;
+      if (b.alpha <= 0) {
+        fxBeams.splice(i, 1);
+        continue;
+      }
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, b.alpha);
+      ctx.strokeStyle = b.color;
+      ctx.lineWidth = b.width || 3;
+      ctx.shadowColor = b.color;
+      ctx.shadowBlur = 10;
+      ctx.beginPath();
+      ctx.moveTo(b.x1, b.y1);
+      ctx.lineTo(b.x2, b.y2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
     fxAnimFrame = requestAnimationFrame(loop);
   }
   loop();
+}
+
+function spawnLaserBeam(x1, y1, x2, y2, color = '#67E8F9') {
+  fxBeams.push({
+    x1, y1, x2, y2,
+    color,
+    alpha: 1.0,
+    width: 3.5,
+    fade: 0.07
+  });
 }
 
 function spawnKeySparks(x, y, color = '#67E8F9') {
@@ -157,100 +261,112 @@ function spawnConfetti() {
   }
 }
 
-// Multi-Profile Mechanical Switch Sound Synthesizer
+// Multi-Profile Mechanical Switch Sound Synthesizer with Volume Control & Dynamic Modulation
 function playClickSound(keyChar) {
-  if (!curState || !curState.soundOn) return;
+  if (!curState || !curState.soundOn || soundVolume <= 0) return;
   try {
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const t = audioCtx.currentTime;
+    const eq = document.getElementById('audioEq');
+    if (eq) {
+      eq.classList.add('playing');
+      clearTimeout(eq._timer);
+      eq._timer = setTimeout(() => eq.classList.remove('playing'), 110);
+    }
+
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    const t = ctx.currentTime;
     const code = (keyChar && keyChar.charCodeAt(0)) || 65;
+    const masterVol = Math.max(0, Math.min(1, soundVolume));
+    const jitter = 0.97 + Math.random() * 0.06;
+    const comboPitch = (viewMode === 3 && typeof arcadeRunning !== 'undefined' && arcadeRunning) ? Math.min(1.8, 1 + (typeof arcadeCombo !== 'undefined' ? arcadeCombo * 0.08 : 0)) : 1;
+    const pMod = jitter * comboPitch;
 
     if (soundProfile === 'blue') {
       // Crisp tactile mechanical click + bounce
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
       osc.type = 'triangle';
-      osc.frequency.setValueAtTime(1800 + (code & 15) * 35, t);
-      osc.frequency.exponentialRampToValueAtTime(800, t + 0.02);
-      gain.gain.setValueAtTime(0.08, t);
+      osc.frequency.setValueAtTime((1800 + (code & 15) * 35) * pMod, t);
+      osc.frequency.exponentialRampToValueAtTime(800 * pMod, t + 0.02);
+      gain.gain.setValueAtTime(0.08 * masterVol, t);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.028);
       osc.connect(gain);
-      gain.connect(audioCtx.destination);
+      gain.connect(ctx.destination);
       osc.start(t);
       osc.stop(t + 0.03);
     } else if (soundProfile === 'brown') {
       // Warm cushioned thud (thock)
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(320 + (code & 7) * 15, t);
-      osc.frequency.exponentialRampToValueAtTime(140, t + 0.04);
-      gain.gain.setValueAtTime(0.12, t);
+      osc.frequency.setValueAtTime((320 + (code & 7) * 15) * pMod, t);
+      osc.frequency.exponentialRampToValueAtTime(140 * pMod, t + 0.04);
+      gain.gain.setValueAtTime(0.12 * masterVol, t);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.045);
       osc.connect(gain);
-      gain.connect(audioCtx.destination);
+      gain.connect(ctx.destination);
       osc.start(t);
       osc.stop(t + 0.05);
     } else if (soundProfile === 'modelm') {
       // IBM Buckling Spring ping + clatter
-      const osc1 = audioCtx.createOscillator();
-      const gain1 = audioCtx.createGain();
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
       osc1.type = 'square';
-      osc1.frequency.setValueAtTime(1250, t);
-      gain1.gain.setValueAtTime(0.05, t);
+      osc1.frequency.setValueAtTime(1250 * pMod, t);
+      gain1.gain.setValueAtTime(0.05 * masterVol, t);
       gain1.gain.exponentialRampToValueAtTime(0.001, t + 0.03);
       osc1.connect(gain1);
-      gain1.connect(audioCtx.destination);
+      gain1.connect(ctx.destination);
       osc1.start(t);
       osc1.stop(t + 0.035);
 
-      const osc2 = audioCtx.createOscillator();
-      const gain2 = audioCtx.createGain();
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
       osc2.type = 'triangle';
-      osc2.frequency.setValueAtTime(2400, t);
-      gain2.gain.setValueAtTime(0.03, t);
+      osc2.frequency.setValueAtTime(2400 * pMod, t);
+      gain2.gain.setValueAtTime(0.03 * masterVol, t);
       gain2.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
       osc2.connect(gain2);
-      gain2.connect(audioCtx.destination);
+      gain2.connect(ctx.destination);
       osc2.start(t + 0.005);
       osc2.stop(t + 0.065);
     } else if (soundProfile === 'typewriter') {
       // Vintage typewriter clack, and Bell on Enter!
       if (keyChar === 'Enter') {
-        const bell = audioCtx.createOscillator();
-        const bGain = audioCtx.createGain();
+        const bell = ctx.createOscillator();
+        const bGain = ctx.createGain();
         bell.type = 'sine';
-        bell.frequency.setValueAtTime(2100, t);
-        bGain.gain.setValueAtTime(0.15, t);
+        bell.frequency.setValueAtTime(2100 * pMod, t);
+        bGain.gain.setValueAtTime(0.15 * masterVol, t);
         bGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
         bell.connect(bGain);
-        bGain.connect(audioCtx.destination);
+        bGain.connect(ctx.destination);
         bell.start(t);
         bell.stop(t + 0.55);
       } else {
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
         osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(450, t);
-        osc.frequency.exponentialRampToValueAtTime(150, t + 0.03);
-        gain.gain.setValueAtTime(0.07, t);
+        osc.frequency.setValueAtTime(450 * pMod, t);
+        osc.frequency.exponentialRampToValueAtTime(150 * pMod, t + 0.03);
+        gain.gain.setValueAtTime(0.07 * masterVol, t);
         gain.gain.exponentialRampToValueAtTime(0.001, t + 0.035);
         osc.connect(gain);
-        gain.connect(audioCtx.destination);
+        gain.connect(ctx.destination);
         osc.start(t);
         osc.stop(t + 0.04);
       }
     } else if (soundProfile === 'scifi') {
       // Sci-Fi Blaster chirp
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
       osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(1400, t);
-      osc.frequency.exponentialRampToValueAtTime(350, t + 0.035);
-      gain.gain.setValueAtTime(0.06, t);
+      osc.frequency.setValueAtTime(1400 * pMod, t);
+      osc.frequency.exponentialRampToValueAtTime(350 * pMod, t + 0.035);
+      gain.gain.setValueAtTime(0.06 * masterVol, t);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.038);
       osc.connect(gain);
-      gain.connect(audioCtx.destination);
+      gain.connect(ctx.destination);
       osc.start(t);
       osc.stop(t + 0.04);
     }
@@ -291,7 +407,7 @@ function heatColor(cnt, maxCnt) {
   return `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
 }
 
-// Initialize DOM structures for A-Z histogram and QWERTY keyboard
+// Initialize Interactive DOM structures for A-Z histogram and QWERTY keyboard
 function initStaticDOM() {
   const histBars = document.getElementById('histBars');
   if (histBars) {
@@ -301,7 +417,30 @@ function initStaticDOM() {
       const isV = 'AEIOU'.includes(ch);
       const col = document.createElement('div');
       col.className = 'hbar-col';
+      col.id = 'hcol_' + ch;
       col.innerHTML = `<div class="hbar-fill ${isV ? 'vowel' : 'cons'}" id="hbar_${i}" style="height:2px"></div><div class="hbar-lbl" id="hlbl_${i}">${ch}</div>`;
+
+      // Interactive Histogram Bar Click: shows frequency details and highlights keyboard key
+      col.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const u = ch;
+        const l = ch.toLowerCase();
+        const count = (curState && curState.freq && ((curState.freq[u] || 0) + (curState.freq[l] || 0))) || 0;
+        const letters = (curState && ((curState.vowels || 0) + (curState.consonants || 0))) || 1;
+        const pct = Math.round((count * 100) / letters);
+        showToast(`📊 Letter [${u}] · Count: ${count} (${pct}% of letters) · ${isV ? 'Vowel' : 'Consonant'}`);
+
+        // Highlight matching keycap
+        const cap = document.getElementById('kcap_' + u);
+        if (cap) {
+          cap.classList.add('ripple');
+          setTimeout(() => cap.classList.remove('ripple'), 240);
+        }
+        playClickSound(u);
+        const rect = col.getBoundingClientRect();
+        spawnKeySparks(rect.left + rect.width / 2, rect.top + 10, isV ? 'var(--green)' : 'var(--amber)');
+      });
+
       histBars.appendChild(col);
     }
   }
@@ -317,13 +456,47 @@ function initStaticDOM() {
         cap.className = 'keycap';
         cap.id = 'kcap_' + k;
         cap.textContent = k;
+
+        // Interactive Keycap Click: plays switch sound, ripples, bursts sparks, and shows stats
+        cap.addEventListener('click', (e) => {
+          e.stopPropagation();
+          playClickSound(k);
+          cap.classList.add('ripple');
+          setTimeout(() => cap.classList.remove('ripple'), 220);
+          const rect = cap.getBoundingClientRect();
+          spawnKeySparks(rect.left + rect.width / 2, rect.top + rect.height / 2, 'var(--cyan)');
+
+          const count = (curState && curState.vkFreq && (curState.vkFreq[k] || curState.vkFreq[k.toLowerCase()])) || 0;
+          const total = (curState && curState.totalKeys) || 1;
+          const pct = Math.round((count * 100) / total);
+          const fInfo = FINGER_MAP[k] ? ` · ✋ Finger: ${FINGER_MAP[k].finger}` : '';
+          const errCount = missedKeysMap[k] ? ` · ⚠️ Errors: ${missedKeysMap[k]}` : '';
+          showToast(`⌨️ Key [${k}] · Pressed: ${count} times (${pct}% of all keys)${fInfo}${errCount}`);
+        });
+
         rDiv.appendChild(cap);
       });
       kbWrap.appendChild(rDiv);
     });
+
     const spRow = document.createElement('div');
     spRow.className = 'kb-row';
-    spRow.innerHTML = `<div class="keycap space" id="kcap_SPC">SPACE</div>`;
+    const spCap = document.createElement('div');
+    spCap.className = 'keycap space';
+    spCap.id = 'kcap_SPC';
+    spCap.textContent = 'SPACE';
+    spCap.addEventListener('click', (e) => {
+      e.stopPropagation();
+      playClickSound(' ');
+      spCap.classList.add('ripple');
+      setTimeout(() => spCap.classList.remove('ripple'), 220);
+      const rect = spCap.getBoundingClientRect();
+      spawnKeySparks(rect.left + rect.width / 2, rect.top + rect.height / 2, 'var(--cyan)');
+      const count = (curState && curState.spaces) || 0;
+      const spErr = missedKeysMap['SPC'] ? ` · ⚠️ Errors: ${missedKeysMap['SPC']}` : '';
+      showToast(`⌨️ Key [SPACE] · Pressed: ${count} times · ✋ Finger: Thumbs${spErr}`);
+    });
+    spRow.appendChild(spCap);
     kbWrap.appendChild(spRow);
   }
 }
@@ -365,7 +538,7 @@ function computeStrainIndex(s) {
   if (!s || !s.totalKeys) return { score: 0, label: 'RELAXED', color: 'var(--green)' };
   const totH = Math.max(1, (s.leftHand || 0) + (s.rightHand || 0));
   const leftPct = Math.round(((s.leftHand || 0) * 100) / totH);
-  const handImbalance = Math.abs(leftPct - 50); // 0 to 50
+  const handImbalance = Math.abs(leftPct - 50);
 
   const activeMin = (s.activeMs || 0) / 60000;
   const timeFactor = Math.min(40, activeMin * 1.5);
@@ -491,21 +664,83 @@ function render(s) {
     }
   }
 
-  // Keyboard Heatmap
-  const vkValues = Object.values(s.vkFreq || {});
-  const heatMax = Math.max(1, ...vkValues);
-  KB_ROWS.flat().forEach((k) => {
-    const cap = document.getElementById('kcap_' + k);
-    if (!cap) return;
-    const cnt = s.vkFreq[k] || 0;
-    cap.style.background = heatColor(cnt, heatMax);
-    cap.style.color = cnt > 0 ? '#fff' : 'var(--muted)';
-  });
-  const spCap = document.getElementById('kcap_SPC');
-  if (spCap) {
-    const spCnt = s.vkFreq['SPC'] || s.vkFreq[' '] || 0;
-    spCap.style.background = heatColor(spCnt, heatMax);
-    spCap.style.color = spCnt > 0 ? '#fff' : 'var(--muted)';
+  // Keyboard Heatmap Mode Rendering (Frequency / Fingers / Missed Keys)
+  const heatLegend = document.getElementById('heatLegend');
+  if (heatMode === 'fingers') {
+    if (heatLegend) heatLegend.textContent = '✋ Ergonomic Touch-Typing 10-Finger Map';
+    KB_ROWS.flat().forEach((k) => {
+      const cap = document.getElementById('kcap_' + k);
+      if (!cap) return;
+      const fInfo = FINGER_MAP[k];
+      if (fInfo) {
+        cap.style.background = fInfo.color;
+        cap.style.color = '#fff';
+        cap.style.boxShadow = `0 0 6px ${fInfo.color}`;
+        cap.classList.add('finger-mode');
+      } else {
+        cap.style.background = 'var(--offkey)';
+        cap.style.color = 'var(--muted)';
+        cap.style.boxShadow = 'none';
+        cap.classList.remove('finger-mode');
+      }
+    });
+    const spCap = document.getElementById('kcap_SPC');
+    if (spCap) {
+      spCap.style.background = FINGER_MAP['SPC'].color;
+      spCap.style.color = '#fff';
+      spCap.style.boxShadow = `0 0 6px ${FINGER_MAP['SPC'].color}`;
+    }
+  } else if (heatMode === 'errors') {
+    if (heatLegend) heatLegend.textContent = '⚠️ Typing Test Missed Keys Heatmap';
+    const errValues = Object.values(missedKeysMap);
+    const errMax = Math.max(1, ...errValues);
+    KB_ROWS.flat().forEach((k) => {
+      const cap = document.getElementById('kcap_' + k);
+      if (!cap) return;
+      const errCnt = missedKeysMap[k] || 0;
+      if (errCnt > 0) {
+        const alpha = 0.35 + (errCnt / errMax) * 0.65;
+        cap.style.background = `rgba(239, 68, 68, ${alpha})`;
+        cap.style.color = '#fff';
+        cap.style.boxShadow = '0 0 8px rgba(239, 68, 68, 0.7)';
+      } else {
+        cap.style.background = 'var(--offkey)';
+        cap.style.color = 'var(--muted)';
+        cap.style.boxShadow = 'none';
+      }
+    });
+    const spCap = document.getElementById('kcap_SPC');
+    if (spCap) {
+      const spErr = missedKeysMap['SPC'] || 0;
+      if (spErr > 0) {
+        spCap.style.background = 'rgba(239, 68, 68, 0.7)';
+        spCap.style.color = '#fff';
+        spCap.style.boxShadow = '0 0 8px rgba(239, 68, 68, 0.7)';
+      } else {
+        spCap.style.background = 'var(--offkey)';
+        spCap.style.color = 'var(--muted)';
+        spCap.style.boxShadow = 'none';
+      }
+    }
+  } else {
+    if (heatLegend) heatLegend.textContent = 'cold 🟦🟩🟨🟧🟥 hot';
+    const vkValues = Object.values(s.vkFreq || {});
+    const heatMax = Math.max(1, ...vkValues);
+    KB_ROWS.flat().forEach((k) => {
+      const cap = document.getElementById('kcap_' + k);
+      if (!cap) return;
+      const cnt = s.vkFreq[k] || 0;
+      cap.style.background = heatColor(cnt, heatMax);
+      cap.style.color = cnt > 0 ? '#fff' : 'var(--muted)';
+      cap.style.boxShadow = 'none';
+    });
+    const spCap = document.getElementById('kcap_SPC');
+    if (spCap) {
+      const spCnt = s.vkFreq['SPC'] || s.vkFreq[' '] || 0;
+      spCap.style.background = heatColor(spCnt, heatMax);
+      spCap.style.color = spCnt > 0 ? '#fff' : 'var(--muted)';
+      spCap.style.boxShadow = 'none';
+    }
   }
 
   // WPM History SVG
@@ -617,9 +852,9 @@ let ttDone = false;
 
 function resetTypingTest(nextSent = false) {
   const modeKey = MODE_KEYS[ttModeIdx];
-  const list = TEST_SENTENCES[modeKey];
+  const list = TEST_SENTENCES[modeKey] || TEST_SENTENCES.STANDARD;
   if (nextSent) ttSentIdx = (ttSentIdx + 1) % list.length;
-  ttTarget = list[ttSentIdx];
+  ttTarget = list[ttSentIdx] || list[0] || 'the quick brown fox jumps over the lazy dog';
   ttTyped = '';
   ttErrors = 0;
   ttKeys = 0;
@@ -634,6 +869,11 @@ function renderTypingTest() {
   box.innerHTML = '';
   let correct = 0;
   for (let i = 0; i < ttTarget.length; i++) {
+    if (i === ttTyped.length && !ttDone) {
+      const cur = document.createElement('span');
+      cur.className = 'tt-cursor';
+      box.appendChild(cur);
+    }
     const sp = document.createElement('span');
     sp.className = 't-ch';
     sp.textContent = ttTarget[i];
@@ -649,8 +889,15 @@ function renderTypingTest() {
     }
     box.appendChild(sp);
   }
+  if (ttTyped.length >= ttTarget.length && !ttDone) {
+    const cur = document.createElement('span');
+    cur.className = 'tt-cursor';
+    box.appendChild(cur);
+  }
+
   const pct = Math.round((ttTyped.length * 100) / Math.max(1, ttTarget.length));
-  document.getElementById('ttProg').style.width = pct + '%';
+  const progEl = document.getElementById('ttProg');
+  if (progEl) progEl.style.width = pct + '%';
 
   const elapsedMs = ttStart > 0 ? Math.max(500, Date.now() - ttStart) : 0;
   const wpm = elapsedMs > 0 ? Math.round((correct * 12000) / elapsedMs) : 0;
@@ -659,6 +906,14 @@ function renderTypingTest() {
   document.getElementById('ttAcc').textContent = acc;
   document.getElementById('ttErr').textContent = ttErrors;
   document.getElementById('ttTime').textContent = Math.floor(elapsedMs / 1000);
+
+  const accLiveEl = document.getElementById('ttAccLive');
+  if (accLiveEl) accLiveEl.textContent = acc + '%';
+  const progTxtEl = document.getElementById('ttProgTxt');
+  if (progTxtEl) progTxtEl.textContent = `${ttTyped.length} / ${ttTarget.length} chars (${pct}%)`;
+  const pacingEl = document.getElementById('ttPacing');
+  if (pacingEl) pacingEl.textContent = wpm >= 65 ? '⚡ Blazing' : (wpm >= 40 ? '👍 Good' : (ttStart > 0 ? '🚶 Steady' : 'Ready'));
+
   if (curState) {
     document.getElementById('ttBest').textContent = curState.testBest || 0;
     document.getElementById('ttAllBest').textContent = curState.allTimeTestBest || 0;
@@ -683,6 +938,7 @@ function switchView(mode) {
   document.getElementById('lblTest').textContent = mode === 1 ? 'Dash' : 'Test';
   if (mode === 1) resetTypingTest(false);
   if (mode === 3 && !arcadeRunning) startArcadeGame();
+  else if (mode !== 3 && arcadeRunning) stopArcadeGame(false);
   if (mode === 4) analyzeZenText();
 }
 
@@ -719,8 +975,37 @@ const ARCADE_VOCAB = {
   ]
 };
 
+let arcadePaused = false;
+function pauseArcadeGame() {
+  if (!arcadeRunning) return;
+  arcadePaused = !arcadePaused;
+  const btnPause = document.getElementById('btnArcadePause');
+  const prompt = document.getElementById('arcadePrompt');
+  if (arcadePaused) {
+    if (btnPause) btnPause.innerHTML = '<span>▶ Resume</span>';
+    if (prompt) {
+      prompt.classList.remove('hidden');
+      prompt.innerHTML = `
+        <div style="font-size:22px;font-weight:800;color:var(--gold);margin-bottom:6px">GAME PAUSED</div>
+        <div style="color:#fff;font-size:13px;margin-bottom:10px">Press 'Resume' or Esc to continue</div>
+        <button class="pill-btn green" id="btnArcadeResumePrompt" style="padding:6px 16px;font-size:12px"><span>▶ Resume Game</span></button>
+      `;
+      const resBtn = document.getElementById('btnArcadeResumePrompt');
+      if (resBtn) resBtn.addEventListener('click', pauseArcadeGame);
+    }
+    showToast('⏸️ Game paused');
+  } else {
+    if (btnPause) btnPause.innerHTML = '<span>⏸️ Pause</span>';
+    if (prompt) prompt.classList.add('hidden');
+    arcadeLastSpawn = Date.now();
+    requestAnimationFrame(arcadeLoop);
+    showToast('▶ Game resumed');
+  }
+}
+
 function startArcadeGame() {
   arcadeRunning = true;
+  arcadePaused = false;
   arcadeScore = 0;
   arcadeShields = 3;
   arcadeCombo = 1;
@@ -731,18 +1016,29 @@ function startArcadeGame() {
   arcadeActiveWords = [];
   arcadeTargetWordId = null;
 
+  const btnPause = document.getElementById('btnArcadePause');
+  if (btnPause) {
+    btnPause.style.display = 'inline-block';
+    btnPause.innerHTML = '<span>⏸️ Pause</span>';
+  }
+
   try {
     const savedHigh = localStorage.getItem('kpmArcadeHigh');
     if (savedHigh) arcadeHighScore = parseInt(savedHigh, 10) || 0;
   } catch (_) {}
 
-  document.getElementById('arcadePrompt').classList.add('hidden');
+  const prompt = document.getElementById('arcadePrompt');
+  if (prompt) prompt.classList.add('hidden');
   updateArcadeUI();
   arcadeLoop();
 }
 
 function stopArcadeGame(isOver = true) {
   arcadeRunning = false;
+  arcadePaused = false;
+  const btnPause = document.getElementById('btnArcadePause');
+  if (btnPause) btnPause.style.display = 'none';
+
   if (isOver) {
     if (arcadeScore > arcadeHighScore) {
       arcadeHighScore = arcadeScore;
@@ -758,7 +1054,8 @@ function stopArcadeGame(isOver = true) {
         <div style="color:#fff;font-size:14px;margin-bottom:8px">Final Score: <b>${arcadeScore}</b> · Words Cleared: <b>${arcadeWordsCleared}</b></div>
         <button class="pill-btn green" id="btnArcadeReplay" style="padding:6px 14px;font-size:12px"><span>Play Again</span></button>
       `;
-      document.getElementById('btnArcadeReplay').addEventListener('click', startArcadeGame);
+      const replayBtn = document.getElementById('btnArcadeReplay');
+      if (replayBtn) replayBtn.addEventListener('click', startArcadeGame);
     }
   }
 }
@@ -785,7 +1082,7 @@ function spawnArcadeWord() {
   const list = ARCADE_VOCAB[diff] || ARCADE_VOCAB.speed;
   const text = list[Math.floor(Math.random() * list.length)];
   const arena = document.getElementById('arcadeArena');
-  const arenaW = arena.clientWidth || 700;
+  const arenaW = Math.max(300, arena.clientWidth || 700);
 
   const id = 'w_' + Math.random().toString(36).substring(2, 9);
   const el = document.createElement('div');
@@ -811,7 +1108,7 @@ function spawnArcadeWord() {
 }
 
 function arcadeLoop() {
-  if (!arcadeRunning || viewMode !== 3) return;
+  if (!arcadeRunning || arcadePaused || viewMode !== 3) return;
   const now = Date.now();
   const diff = document.getElementById('selArcadeDiff').value || 'speed';
   const spawnRate = diff === 'chill' ? 2400 : (diff === 'speed' ? 1750 : 1300);
@@ -821,6 +1118,7 @@ function arcadeLoop() {
     arcadeLastSpawn = now;
   }
 
+  const arena = document.getElementById('arcadeArena');
   const arenaH = 280; // danger threshold
   for (let i = arcadeActiveWords.length - 1; i >= 0; i--) {
     const w = arcadeActiveWords[i];
@@ -828,7 +1126,11 @@ function arcadeLoop() {
     w.el.style.top = w.y + 'px';
 
     if (w.y >= arenaH) {
-      // Hit danger line -> lose a shield!
+      // Hit danger line -> shake arena and lose a shield!
+      if (arena) {
+        arena.classList.add('shake');
+        setTimeout(() => arena.classList.remove('shake'), 350);
+      }
       w.el.remove();
       arcadeActiveWords.splice(i, 1);
       if (arcadeTargetWordId === w.id) arcadeTargetWordId = null;
@@ -849,12 +1151,10 @@ function arcadeLoop() {
 }
 
 function handleArcadeKey(key) {
-  if (!arcadeRunning || viewMode !== 3 || key.length !== 1) return;
+  if (!arcadeRunning || arcadePaused || viewMode !== 3 || key.length !== 1) return;
 
-  // If already locked onto a target word
   let target = arcadeActiveWords.find((w) => w.id === arcadeTargetWordId);
   if (!target) {
-    // Find earliest falling word whose next letter matches
     target = arcadeActiveWords.find((w) => w.text[w.typedLen] === key.toLowerCase());
     if (target) {
       arcadeTargetWordId = target.id;
@@ -869,13 +1169,33 @@ function handleArcadeKey(key) {
     const rem = target.text.slice(target.typedLen);
     target.el.innerHTML = `<span class="matched">${matched}</span><span class="remaining">${rem}</span>`;
 
-    // Visual sparks at word location
     const rect = target.el.getBoundingClientRect();
     spawnKeySparks(rect.left + 15, rect.top + 10, 'var(--gold)');
 
     // Word destroyed!
     if (target.typedLen >= target.text.length) {
       spawnKeySparks(rect.left + rect.width / 2, rect.top, '#6EE7B7');
+      const pts = target.text.length * 15 * arcadeCombo;
+
+      const arena = document.getElementById('arcadeArena');
+      if (arena) {
+        const aRect = arena.getBoundingClientRect();
+        const startX = aRect.left + aRect.width / 2;
+        const startY = aRect.bottom - 15;
+        const targetX = rect.left + rect.width / 2;
+        const targetY = rect.top + rect.height / 2;
+        spawnLaserBeam(startX, startY, targetX, targetY, 'var(--cyan)');
+
+        // Floating score animation
+        const floatEl = document.createElement('div');
+        floatEl.className = 'floating-score';
+        floatEl.textContent = `+${pts} (${arcadeCombo}x)`;
+        floatEl.style.left = (target.x + 20) + 'px';
+        floatEl.style.top = (target.y + 10) + 'px';
+        arena.appendChild(floatEl);
+        setTimeout(() => floatEl.remove(), 850);
+      }
+
       target.el.remove();
       arcadeActiveWords = arcadeActiveWords.filter((w) => w.id !== target.id);
       arcadeTargetWordId = null;
@@ -885,8 +1205,12 @@ function handleArcadeKey(key) {
       if (arcadeStreak % 5 === 0) arcadeCombo = Math.min(10, arcadeCombo + 1);
       if (arcadeCombo > arcadeMaxCombo) arcadeMaxCombo = arcadeCombo;
 
-      arcadeScore += target.text.length * 15 * arcadeCombo;
-      if (arcadeWordsCleared % 10 === 0) arcadeWave++;
+      arcadeScore += pts;
+      if (arcadeWordsCleared % 10 === 0) {
+        arcadeWave++;
+        spawnConfetti();
+        showToast(`⚡ WAVE ${arcadeWave} CLEARED! Speed increasing!`);
+      }
       updateArcadeUI();
     }
   }
@@ -965,7 +1289,6 @@ function analyzeZenText() {
   document.getElementById('zenReadTime').textContent = readSec < 60 ? readSec + 's' : Math.round(readSec / 60) + 'm';
   document.getElementById('zenSpeakTime').textContent = speakSec < 60 ? speakSec + 's' : Math.round(speakSec / 60) + 'm';
 
-  // Auto-Detect Caesar Cipher using Chi-Squared
   evaluateCaesarDecryption(text);
 }
 
@@ -1029,7 +1352,7 @@ function applyCaesarShift(shift) {
   document.getElementById('zenDecodedPreview').textContent = out || 'Decoded text will appear here...';
 }
 
-// Export HTML, CSV and JSON reports
+// Export HTML, CSV and JSON reports with Blob URL cleanup to prevent memory leaks
 function exportReports() {
   if (!curState) return;
   const s = curState;
@@ -1039,16 +1362,40 @@ function exportReports() {
   a1.href = jsonUrl;
   a1.download = 'KeyReport.json';
   a1.click();
+  setTimeout(() => URL.revokeObjectURL(jsonUrl), 1500);
 
   let csv = 'metric,value\r\n';
   csv += `Total keys,${s.totalKeys}\r\nVowels,${s.vowels}\r\nConsonants,${s.consonants}\r\nWords,${s.words}\r\nPeak WPM,${s.wpmPeak}\r\nAverage WPM,${s.wpmAvg}\r\nAvg Latency ms,${s.avgLatMs}\r\nBest Streak,${s.bestStreak}\r\n\r\nkey,count\r\n`;
   Object.entries(s.freq || {}).forEach(([k, v]) => { csv += `"${k}",${v}\r\n`; });
   const csvBlob = new Blob([csv], { type: 'text/csv' });
   const a2 = document.createElement('a');
-  a2.href = URL.createObjectURL(csvBlob);
+  const csvUrl = URL.createObjectURL(csvBlob);
+  a2.href = csvUrl;
   a2.download = 'KeyReport.csv';
   a2.click();
+  setTimeout(() => URL.revokeObjectURL(csvUrl), 1500);
+
   showToast('✓ Exported KeyReport.json and KeyReport.csv');
+}
+
+// Resilient messaging helper
+function safeSendMessage(msg, callback) {
+  try {
+    if (window.chrome && window.chrome.runtime && window.chrome.runtime.sendMessage) {
+      chrome.runtime.sendMessage(msg, (res) => {
+        if (chrome.runtime.lastError) {
+          // Extension context may have been invalidated or service worker restarting
+          if (typeof callback === 'function') callback(null);
+          return;
+        }
+        if (typeof callback === 'function') callback(res);
+      });
+    } else {
+      if (typeof callback === 'function') callback(null);
+    }
+  } catch (_) {
+    if (typeof callback === 'function') callback(null);
+  }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1078,17 +1425,60 @@ document.addEventListener('DOMContentLoaded', () => {
     selProf.addEventListener('change', (e) => {
       soundProfile = e.target.value;
       try { localStorage.setItem('kpmSoundProfile', soundProfile); } catch (_) {}
+      getAudioContext();
       playClickSound('A');
-      showToast('✓ Sound: ' + selProf.options[selProf.selectedIndex].text);
+      showToast('✓ Switch: ' + selProf.options[selProf.selectedIndex].text);
     });
   }
 
-  chrome.runtime.sendMessage({ type: 'KPM_GET_STATE' }, (res) => {
+  // Volume Slider & Mute Toggle
+  const rngVol = document.getElementById('rngVolume');
+  const volIcon = document.getElementById('volIcon');
+  if (rngVol) {
+    try {
+      const savedVol = localStorage.getItem('kpmVolume');
+      if (savedVol !== null) {
+        soundVolume = parseFloat(savedVol);
+        rngVol.value = Math.round(soundVolume * 100);
+      }
+    } catch (_) {}
+
+    rngVol.addEventListener('input', (e) => {
+      soundVolume = Math.max(0, Math.min(1, parseInt(e.target.value, 10) / 100));
+      try { localStorage.setItem('kpmVolume', String(soundVolume)); } catch (_) {}
+      if (volIcon) volIcon.textContent = soundVolume === 0 ? '🔇' : (soundVolume < 0.4 ? '🔉' : '🔊');
+    });
+    rngVol.addEventListener('change', () => {
+      getAudioContext();
+      playClickSound('A');
+    });
+  }
+
+  if (volIcon) {
+    volIcon.addEventListener('click', () => {
+      if (soundVolume > 0) {
+        soundVolume = 0;
+        rngVol.value = 0;
+        volIcon.textContent = '🔇';
+        showToast('🔇 Sound muted');
+      } else {
+        soundVolume = 0.7;
+        rngVol.value = 70;
+        volIcon.textContent = '🔊';
+        showToast('🔊 Sound unmuted');
+        getAudioContext();
+        playClickSound('A');
+      }
+      try { localStorage.setItem('kpmVolume', String(soundVolume)); } catch (_) {}
+    });
+  }
+
+  safeSendMessage({ type: 'KPM_GET_STATE' }, (res) => {
     if (res && res.state) render(res.state);
   });
 
   setInterval(() => {
-    chrome.runtime.sendMessage({ type: 'KPM_GET_STATE' }, (res) => {
+    safeSendMessage({ type: 'KPM_GET_STATE' }, (res) => {
       if (res && res.state) render(res.state);
     });
     if (viewMode === 1 && ttStart > 0 && !ttDone) renderTypingTest();
@@ -1104,7 +1494,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Buttons
   function doResetAll() {
-    chrome.runtime.sendMessage({ type: 'KPM_RESET', clearAll: true }, (res) => {
+    safeSendMessage({ type: 'KPM_RESET', clearAll: true }, (res) => {
       if (res && res.state) render(res.state);
       resetTypingTest(false);
       showToast('✓ All records refreshed & cleared to 0');
@@ -1119,7 +1509,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (hudToggle) {
     hudToggle.addEventListener('click', () => {
       const next = (curState && curState.hudOn === false) ? true : false;
-      chrome.runtime.sendMessage({ type: 'KPM_SET_PREFS', hudOn: next }, (res) => {
+      safeSendMessage({ type: 'KPM_SET_PREFS', hudOn: next }, (res) => {
         if (res && res.state) render(res.state);
         showToast(next ? '✓ Floating webpage HUD enabled' : '✗ Floating webpage HUD hidden');
       });
@@ -1129,7 +1519,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnExport').addEventListener('click', exportReports);
 
   document.getElementById('btnPause').addEventListener('click', () => {
-    chrome.runtime.sendMessage({ type: 'KPM_TOGGLE_PAUSE' }, (res) => {
+    safeSendMessage({ type: 'KPM_TOGGLE_PAUSE' }, (res) => {
       if (res && res.state) render(res.state);
     });
   });
@@ -1149,7 +1539,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnTheme').addEventListener('click', () => {
     const cur = (curState && curState.theme) || 'midnight';
     const next = THEMES[(THEMES.indexOf(cur) + 1) % THEMES.length];
-    chrome.runtime.sendMessage({ type: 'KPM_SET_PREFS', theme: next }, (res) => {
+    safeSendMessage({ type: 'KPM_SET_PREFS', theme: next }, (res) => {
       if (res && res.state) render(res.state);
       showToast('✓ Theme: ' + next.toUpperCase());
     });
@@ -1157,7 +1547,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('btnSound').addEventListener('click', () => {
     const next = !(curState && curState.soundOn);
-    chrome.runtime.sendMessage({ type: 'KPM_SET_PREFS', soundOn: next }, (res) => {
+    getAudioContext();
+    safeSendMessage({ type: 'KPM_SET_PREFS', soundOn: next }, (res) => {
       if (res && res.state) render(res.state);
       if (next) playClickSound('A');
       showToast(next ? '✓ Mechanical sound ON' : '✗ Mechanical sound OFF');
@@ -1165,26 +1556,34 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.getElementById('btnOpenTab').addEventListener('click', () => {
-    chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') });
+    if (window.chrome && chrome.tabs && chrome.tabs.create) {
+      chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') });
+    } else {
+      window.open('popup.html', '_blank');
+    }
   });
 
   const helpBtn = document.getElementById('btnHelp');
   if (helpBtn) {
     helpBtn.addEventListener('click', () => {
-      chrome.tabs.create({ url: chrome.runtime.getURL('guide.html') });
+      if (window.chrome && chrome.tabs && chrome.tabs.create) {
+        chrome.tabs.create({ url: chrome.runtime.getURL('guide.html') });
+      } else {
+        window.open('guide.html', '_blank');
+      }
     });
   }
 
   document.getElementById('btnNDec').addEventListener('click', () => {
     const n = Math.max(8, ((curState && curState.nView) || 32) - 4);
-    chrome.runtime.sendMessage({ type: 'KPM_SET_PREFS', nView: n }, (res) => {
+    safeSendMessage({ type: 'KPM_SET_PREFS', nView: n }, (res) => {
       if (res && res.state) render(res.state);
     });
   });
 
   document.getElementById('btnNInc').addEventListener('click', () => {
     const n = Math.min(64, ((curState && curState.nView) || 32) + 4);
-    chrome.runtime.sendMessage({ type: 'KPM_SET_PREFS', nView: n }, (res) => {
+    safeSendMessage({ type: 'KPM_SET_PREFS', nView: n }, (res) => {
       if (res && res.state) render(res.state);
     });
   });
@@ -1198,6 +1597,19 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnNextSent').addEventListener('click', () => {
     resetTypingTest(true);
   });
+
+  const btnRestartSent = document.getElementById('btnRestartSent');
+  if (btnRestartSent) {
+    btnRestartSent.addEventListener('click', () => {
+      ttTyped = '';
+      ttErrors = 0;
+      ttKeys = 0;
+      ttStart = 0;
+      ttDone = false;
+      renderTypingTest();
+      showToast('↺ Restarted current sentence');
+    });
+  }
 
   // Custom Text Modal
   const btnCustom = document.getElementById('btnCustomText');
@@ -1218,6 +1630,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ttModeIdx = MODE_KEYS.indexOf('CUSTOM');
         ttSentIdx = 0;
         resetTypingTest(false);
+        showToast('✓ Custom practice sentence loaded');
       }
       modalCustom.classList.add('hidden');
     });
@@ -1226,8 +1639,28 @@ document.addEventListener('DOMContentLoaded', () => {
   // Word Blitz Arcade Controls
   const btnArcStart = document.getElementById('btnArcadeStart');
   if (btnArcStart) btnArcStart.addEventListener('click', startArcadeGame);
+  const btnArcPause = document.getElementById('btnArcadePause');
+  if (btnArcPause) btnArcPause.addEventListener('click', pauseArcadeGame);
   const btnArcReset = document.getElementById('btnArcadeReset');
   if (btnArcReset) btnArcReset.addEventListener('click', () => stopArcadeGame(false));
+
+  // Heatmap Mode Selector
+  const selHeat = document.getElementById('selHeatMode');
+  if (selHeat) {
+    selHeat.addEventListener('change', (e) => {
+      heatMode = e.target.value;
+      if (curState) render(curState);
+      const names = { freq: '🔥 Frequency', fingers: '✋ Finger Ergonomics', errors: '⚠️ Missed Keys' };
+      showToast(`Heatmap Mode: ${names[heatMode]}`);
+    });
+  }
+
+  // Automatic Game Pause on Tab Visibility Change
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && arcadeRunning && !arcadePaused) {
+      pauseArcadeGame();
+    }
+  });
 
   // Zen Scratchpad Events
   const zenEditor = document.getElementById('zenEditor');
@@ -1236,29 +1669,98 @@ document.addEventListener('DOMContentLoaded', () => {
   const rotSlider = document.getElementById('zenRotSlider');
   if (rotSlider) rotSlider.addEventListener('input', (e) => applyCaesarShift(parseInt(e.target.value, 10)));
 
+  const btnRotDec = document.getElementById('btnRotDec');
+  if (btnRotDec) {
+    btnRotDec.addEventListener('click', () => {
+      const slider = document.getElementById('zenRotSlider');
+      let val = (parseInt(slider.value, 10) || 0) - 1;
+      if (val < 0) val = 25;
+      slider.value = val;
+      applyCaesarShift(val);
+    });
+  }
+  const btnRotInc = document.getElementById('btnRotInc');
+  if (btnRotInc) {
+    btnRotInc.addEventListener('click', () => {
+      const slider = document.getElementById('zenRotSlider');
+      let val = (parseInt(slider.value, 10) || 0) + 1;
+      if (val > 25) val = 0;
+      slider.value = val;
+      applyCaesarShift(val);
+    });
+  }
+
   const btnPangram = document.getElementById('btnZenPangram');
   if (btnPangram) btnPangram.addEventListener('click', () => {
     zenEditor.value = 'The quick brown fox jumps over the lazy dog. Pack my box with five dozen liquor jugs.';
     analyzeZenText();
+    showToast('✓ Loaded pangram sample');
   });
   const btnQuote = document.getElementById('btnZenQuote');
   if (btnQuote) btnQuote.addEventListener('click', () => {
     zenEditor.value = 'Simplicity is prerequisite for reliability. Hardware eventually fails; software eventually works.';
     analyzeZenText();
+    showToast('✓ Loaded engineering quote');
   });
   const btnRot = document.getElementById('btnZenRot');
   if (btnRot) btnRot.addEventListener('click', () => {
     zenEditor.value = 'Gur dhvpx oebja sbk whzcf bire gur ynml qbt (ROT-13 Cipher Text).';
     analyzeZenText();
+    showToast('✓ Loaded ROT-13 cipher sample');
   });
   const btnClear = document.getElementById('btnZenClear');
   if (btnClear) btnClear.addEventListener('click', () => {
     zenEditor.value = '';
     analyzeZenText();
+    showToast('✓ Cleared scratchpad');
   });
+  const btnZenCopy = document.getElementById('btnZenCopy');
+  if (btnZenCopy) {
+    btnZenCopy.addEventListener('click', () => {
+      const val = zenEditor.value || '';
+      if (!val) {
+        showToast('⚠️ Scratchpad is empty');
+        return;
+      }
+      navigator.clipboard.writeText(val).then(() => {
+        showToast('✓ Copied scratchpad text to clipboard');
+      }).catch(() => {
+        showToast('✓ Text ready in scratchpad');
+      });
+    });
+  }
 
-  // Global Keyboard listener inside the extension popup/tab itself
+  // Global Keyboard listener with Input Element Isolation
   window.addEventListener('keydown', (e) => {
+    // Error Mitigation: If user is typing in a textarea or input, do not capture hotkeys or trigger tests!
+    const isInputEl = e.target && (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT');
+    if (isInputEl) {
+      if (e.key === 'Escape' && modalCustom && !modalCustom.classList.contains('hidden')) {
+        modalCustom.classList.add('hidden');
+      }
+      return;
+    }
+
+    if (e.key === 'Escape' && viewMode === 3) {
+      e.preventDefault();
+      pauseArcadeGame();
+      return;
+    }
+
+    if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && viewMode === 0) {
+      e.preventDefault();
+      const modes = ['freq', 'fingers', 'errors'];
+      const curIdx = modes.indexOf(heatMode);
+      const nextIdx = e.key === 'ArrowUp' ? (curIdx + 1) % modes.length : (curIdx + modes.length - 1) % modes.length;
+      heatMode = modes[nextIdx];
+      const sel = document.getElementById('selHeatMode');
+      if (sel) sel.value = heatMode;
+      if (curState) render(curState);
+      const names = { freq: '🔥 Frequency', fingers: '✋ Finger Ergonomics', errors: '⚠️ Missed Keys' };
+      showToast(`Heatmap Mode: ${names[heatMode]}`);
+      return;
+    }
+
     if (e.key === 'F1') { e.preventDefault(); document.getElementById('btnReset').click(); return; }
     if (e.key === 'F2') { e.preventDefault(); exportReports(); return; }
     if (e.key === 'F3') { e.preventDefault(); document.getElementById('btnPause').click(); return; }
@@ -1276,6 +1778,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (['Shift', 'Control', 'Alt', 'Meta', 'CapsLock'].includes(e.key)) return;
 
+    getAudioContext();
     playClickSound(e.key);
 
     // Visual ripple and sparks on heatmap
@@ -1293,20 +1796,13 @@ document.addEventListener('DOMContentLoaded', () => {
       handleArcadeKey(e.key);
     }
 
-    // Send key to background state (in standalone web mode, content.js already records it)
-    const isRealExt = !!(window.chrome && window.chrome.runtime && window.chrome.runtime.id);
-    if (isRealExt) {
-      chrome.runtime.sendMessage({
-        type: 'KPM_KEY',
-        payload: { key: e.key, code: e.code }
-      }, (res) => {
-        if (res && res.state) render(res.state);
-      });
-    } else {
-      chrome.runtime.sendMessage({ type: 'KPM_GET_STATE' }, (res) => {
-        if (res && res.state) render(res.state);
-      });
-    }
+    // Send key to background state
+    safeSendMessage({
+      type: 'KPM_KEY',
+      payload: { key: e.key, code: e.code }
+    }, (res) => {
+      if (res && res.state) render(res.state);
+    });
 
     // If Typing Test view is active, handle sentence input
     if (viewMode === 1) {
@@ -1324,16 +1820,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const expected = ttTarget[ttTyped.length];
         ttTyped += e.key;
         ttKeys++;
-        if (e.key !== expected) ttErrors++;
+        if (e.key !== expected) {
+          ttErrors++;
+          const mKey = expected === ' ' ? 'SPC' : (expected ? expected.toUpperCase() : '?');
+          missedKeysMap[mKey] = (missedKeysMap[mKey] || 0) + 1;
+        }
         if (ttTyped.length >= ttTarget.length) {
           ttDone = true;
           renderTypingTest();
           spawnConfetti();
           const finalWpm = parseInt(document.getElementById('ttWpm').textContent, 10) || 0;
-          chrome.runtime.sendMessage({ type: 'KPM_SET_PREFS', testBest: finalWpm }, (res) => {
+          safeSendMessage({ type: 'KPM_SET_PREFS', testBest: finalWpm }, (res) => {
             if (res && res.state) render(res.state);
           });
-          document.getElementById('ttStatus').innerHTML = `<b style="color:var(--green)">🎉 Sentence complete!</b> Speed: <b>${finalWpm} WPM</b> · Press <b>Enter</b> for the next sentence or <b>Tab</b> to switch category.`;
+          document.getElementById('ttStatus').innerHTML = `<b style="color:var(--green)">🎉 Sentence complete!</b> Speed: <b>${finalWpm} WPM</b> · Press <b>Enter</b> for next sentence or <b>Tab</b> to switch category.`;
         } else {
           renderTypingTest();
         }

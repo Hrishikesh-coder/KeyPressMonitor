@@ -3,6 +3,13 @@
 // and displays a sleek, freely draggable and resizable floating HUD with 1-click Reset, Sound, and Combo meter.
 
 (function () {
+  // Do not run content script inside the extension's own popup/dashboard pages
+  if (typeof window !== 'undefined') {
+    if (document.getElementById('viewDash') || (window.location && window.location.pathname && (window.location.pathname.endsWith('popup.html') || window.location.pathname.endsWith('index.html')))) {
+      return;
+    }
+  }
+
   // Remove any stale HUD elements from previous extension reloads in this tab
   document.querySelectorAll('#kpm-floating-hud-host').forEach((el) => el.remove());
 
@@ -442,13 +449,22 @@
     });
   } catch (_) {}
 
-  // Capture keystrokes in real-time
+  // Capture keystrokes in real-time with duplicate-dispatch mitigation
+  let lastContentKey = '';
+  let lastContentTime = 0;
+
   function onKeyDown(e) {
     try {
+      if (e.isComposing) return;
       // Never log password inputs for security & Chrome Web Store compliance
       const el = e.target;
       if (el && el.tagName === 'INPUT' && el.type === 'password') return;
       if (['Shift', 'Control', 'Alt', 'Meta', 'CapsLock'].includes(e.key)) return;
+
+      const now = Date.now();
+      if (e.key === lastContentKey && (now - lastContentTime) < 25) return;
+      lastContentKey = e.key;
+      lastContentTime = now;
 
       chrome.runtime.sendMessage({
         type: 'KPM_KEY',
