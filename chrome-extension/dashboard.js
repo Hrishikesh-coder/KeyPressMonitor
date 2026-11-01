@@ -1486,7 +1486,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // View Navigation Tabs
   document.querySelectorAll('.nav-tab').forEach((tab) => {
-    tab.addEventListener('click', () => {
+    tab.addEventListener('click', (e) => {
+      if (e.currentTarget) e.currentTarget.blur();
       const mode = parseInt(tab.getAttribute('data-view'), 10);
       switchView(mode);
     });
@@ -1588,19 +1589,22 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  document.getElementById('btnCycleMode').addEventListener('click', () => {
+  document.getElementById('btnCycleMode').addEventListener('click', (e) => {
+    if (e.currentTarget) e.currentTarget.blur();
     ttModeIdx = (ttModeIdx + 1) % MODE_KEYS.length;
     ttSentIdx = 0;
     resetTypingTest(false);
   });
 
-  document.getElementById('btnNextSent').addEventListener('click', () => {
+  document.getElementById('btnNextSent').addEventListener('click', (e) => {
+    if (e.currentTarget) e.currentTarget.blur();
     resetTypingTest(true);
   });
 
   const btnRestartSent = document.getElementById('btnRestartSent');
   if (btnRestartSent) {
-    btnRestartSent.addEventListener('click', () => {
+    btnRestartSent.addEventListener('click', (e) => {
+      if (e.currentTarget) e.currentTarget.blur();
       ttTyped = '';
       ttErrors = 0;
       ttKeys = 0;
@@ -1806,11 +1810,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // If Typing Test view is active, handle sentence input
     if (viewMode === 1) {
+      if (e.key === ' ') {
+        e.preventDefault(); // Prevent page scroll and button re-activation
+      }
       if (ttDone) {
-        if (e.key === 'Enter') resetTypingTest(true);
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          resetTypingTest(true);
+        }
         return;
       }
       if (e.key === 'Backspace') {
+        e.preventDefault();
         if (ttTyped.length > 0) ttTyped = ttTyped.slice(0, -1);
         renderTypingTest();
         return;
