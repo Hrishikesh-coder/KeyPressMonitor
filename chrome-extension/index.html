@@ -63,6 +63,7 @@
       <button class="nav-tab" data-view="2" id="tabErgo">🧬 Biomechanics & XP</button>
       <button class="nav-tab" data-view="3" id="tabArcade">🎮 Word Blitz Arcade</button>
       <button class="nav-tab" data-view="4" id="tabZen">📜 Zen & Crypto Lab</button>
+      <button class="nav-tab" data-view="5" id="tabRace">🏁 Multiplayer Race</button>
     </nav>
 
     <!-- VIEW 0: MAIN DASHBOARD -->
@@ -98,6 +99,9 @@
           <div class="chip">SYMBOLS <b id="chSymbols" style="color:var(--purp)">0</b></div>
           <div class="chip">OTHER <b id="chOthers">0</b></div>
           <div class="chip">WORDS <b id="chWords" style="color:var(--green)">0</b></div>
+          <div class="chip" title="Bengali / Devanagari Vowels">INDIC V <b id="chIndVow" style="color:var(--green)">0</b></div>
+          <div class="chip" title="Bengali / Devanagari Consonants">INDIC C <b id="chIndCons" style="color:var(--amber)">0</b></div>
+          <div class="chip" title="Dependent Vowel Signs (Matras)">MATRAS <b id="chIndMatras" style="color:var(--purp)">0</b></div>
         </div>
         <div class="mix-wrap">
           <span style="color:var(--green)">V</span>
@@ -399,6 +403,51 @@
       </div>
     </section>
 
+    <!-- VIEW 5: MULTIPLAYER RACE & COMPETITION -->
+    <section id="viewRace" class="hidden">
+      <div class="panel">
+        <div class="panel-hdr">
+          <span>🏁 MULTIPLAYER RACE & COMPETITION</span>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input type="text" id="racePlayerName" placeholder="Your Name" value="Player 1" style="background:var(--track);border:1px solid var(--border);border-radius:4px;color:#fff;padding:4px 8px;font-size:12px;width:110px">
+            <input type="text" id="raceRoomCode" placeholder="Room Code" style="background:var(--track);border:1px solid var(--border);border-radius:4px;color:#fff;padding:4px 8px;font-size:12px;width:90px">
+            <button class="pill-btn purp" id="btnJoinRace" style="padding:4px 10px;font-size:12px"><span>⚔️ Join Room</span></button>
+            <button class="pill-btn green" id="btnGhostRace" style="padding:4px 10px;font-size:12px"><span>👻 Race Ghost / Bot</span></button>
+          </div>
+        </div>
+        <div style="padding:16px">
+          <!-- Race Track Lanes -->
+          <div class="race-track" style="display:flex;flex-direction:column;gap:12px;margin-bottom:16px">
+            <div class="race-lane" style="background:rgba(0,0,0,0.3);padding:10px 14px;border-radius:6px;border:1px solid var(--border)">
+              <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px">
+                <span>👤 <b>You</b> (<span id="raceMyName">Player 1</span>)</span>
+                <span>Speed: <b id="raceMyWpm" style="color:var(--green)">0 WPM</b> · Acc: <b id="raceMyAcc">100%</b></span>
+              </div>
+              <div style="background:var(--track);height:14px;border-radius:7px;overflow:hidden;position:relative">
+                <div id="raceMyProgress" style="background:linear-gradient(90deg,var(--green),var(--cyan));height:100%;width:0%;transition:width 0.1s linear"></div>
+              </div>
+            </div>
+            <div class="race-lane" style="background:rgba(0,0,0,0.3);padding:10px 14px;border-radius:6px;border:1px solid var(--border)">
+              <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px">
+                <span>🤖 <b>Opponent</b> (<span id="raceOppName">Cyber Ghost</span>)</span>
+                <span>Speed: <b id="raceOppWpm" style="color:var(--amber)">0 WPM</b> · Acc: <b id="raceOppAcc">98%</b></span>
+              </div>
+              <div style="background:var(--track);height:14px;border-radius:7px;overflow:hidden;position:relative">
+                <div id="raceOppProgress" style="background:linear-gradient(90deg,var(--amber),var(--purp));height:100%;width:0%;transition:width 0.1s linear"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sentence to type -->
+          <div style="background:var(--track);padding:14px;border-radius:8px;border:1px solid var(--border);margin-bottom:12px">
+            <div id="raceSentenceText" style="font-family:Consolas,monospace;font-size:15px;line-height:1.6;color:var(--muted)">The quick brown fox jumps over the lazy dog.</div>
+            <input type="text" id="raceInputBox" placeholder="Type here when race starts..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="width:100%;margin-top:10px;padding:8px 12px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:6px;color:#fff;font-family:Consolas,monospace;font-size:14px;outline:none">
+          </div>
+          <div id="raceStatusMsg" style="text-align:center;font-weight:600;color:var(--cyan);font-size:13px">Click 'Race Ghost / Bot' or enter a Room Code to compete!</div>
+        </div>
+      </div>
+    </section>
+
     <!-- Custom Text Modal (in Typing Test) -->
     <div id="modalCustomText" class="hidden">
       <div class="custom-backdrop" id="modalBackdrop"></div>
@@ -432,6 +481,8 @@
       <div class="btn-group">
         <button class="pill-btn" id="btnReset"><kbd>F1</kbd><span>Reset</span></button>
         <button class="pill-btn" id="btnExport"><kbd>F2</kbd><span>Export HTML/CSV/JSON</span></button>
+        <input type="file" id="fileMasmImport" accept=".json" style="display:none">
+        <button class="pill-btn purp" id="btnImportMasm" title="Import KeyReport.json exported from MASM"><span>📥 Import MASM JSON</span></button>
         <button class="pill-btn" id="btnPause"><kbd>F3</kbd><span id="lblPause">Pause</span></button>
         <button class="pill-btn gold" id="btnArcade"><kbd>F4</kbd><span>Arcade</span></button>
         <button class="pill-btn purp" id="btnTest"><kbd>F5</kbd><span id="lblTest">Test</span></button>

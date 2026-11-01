@@ -522,7 +522,7 @@ rpXpLvl      DB "XP Level         : ", 0
 rpBadges     DB "Badges unlocked  : ", 0
 csvHdr       DB "metric,value", 13, 10, 0
 csvKeyHdr    DB 13, 10, "ascii,key,count", 13, 10, 0
-jsOpen       DB "{", 13, 10, '  "totalKeys": ', 0
+jsOpen       DB "{", 13, 10, '  "schemaVersion": 2,', 13, 10, '  "totalKeys": ', 0
 jsVow        DB ',', 13, 10, '  "vowels": ', 0
 jsCon        DB ',', 13, 10, '  "consonants": ', 0
 jsWds        DB ',', 13, 10, '  "words": ', 0

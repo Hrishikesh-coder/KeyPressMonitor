@@ -624,6 +624,12 @@ function render(s) {
   document.getElementById('chSymbols').textContent = s.symbols;
   document.getElementById('chOthers').textContent = s.others;
   document.getElementById('chWords').textContent = s.words;
+  const elIndV = document.getElementById('chIndVow');
+  if (elIndV) elIndV.textContent = s.indicVowels || 0;
+  const elIndC = document.getElementById('chIndCons');
+  if (elIndC) elIndC.textContent = s.indicConsonants || 0;
+  const elIndM = document.getElementById('chIndMatras');
+  if (elIndM) elIndM.textContent = s.indicMatras || 0;
   const vPct = (s.vowels + s.consonants) > 0 ? Math.round((s.vowels * 100) / letters) : 50;
   document.getElementById('mixV').style.width = vPct + '%';
   document.getElementById('mixC').style.width = (100 - vPct) + '%';
@@ -920,7 +926,7 @@ function renderTypingTest() {
   }
 }
 
-// Switch between the 5 Views
+// Switch between the Views (0: Dash, 1: Test, 2: Ergo, 3: Arcade, 4: Zen, 5: Race)
 function switchView(mode) {
   viewMode = mode;
   document.getElementById('viewDash').classList.toggle('hidden', mode !== 0);
@@ -928,6 +934,8 @@ function switchView(mode) {
   document.getElementById('viewErgo').classList.toggle('hidden', mode !== 2);
   document.getElementById('viewArcade').classList.toggle('hidden', mode !== 3);
   document.getElementById('viewZen').classList.toggle('hidden', mode !== 4);
+  const viewRace = document.getElementById('viewRace');
+  if (viewRace) viewRace.classList.toggle('hidden', mode !== 5);
 
   // Update Navigation Tab Buttons
   document.querySelectorAll('.nav-tab').forEach((t) => {
@@ -1398,10 +1406,228 @@ function safeSendMessage(msg, callback) {
   }
 }
 
+// ==========================================
+// VIEW 5: MULTIPLAYER RACE & COMPETITION
+// ==========================================
+let raceTargetText = 'The quick brown fox jumps over the lazy dog.';
+let raceStartTime = 0;
+let raceDone = false;
+let raceBotTimer = null;
+let raceChannel = null;
+let raceOppProgress = 0;
+
+function initMultiplayerRace() {
+  const pNameInput = document.getElementById('racePlayerName');
+  const rCodeInput = document.getElementById('raceRoomCode');
+  const btnJoin = document.getElementById('btnJoinRace');
+  const btnGhost = document.getElementById('btnGhostRace');
+  const inputEl = document.getElementById('raceInputBox');
+  const sentEl = document.getElementById('raceSentenceText');
+  const myProgEl = document.getElementById('raceMyProgress');
+  const oppProgEl = document.getElementById('raceOppProgress');
+  const myWpmEl = document.getElementById('raceMyWpm');
+  const oppWpmEl = document.getElementById('raceOppWpm');
+  const myAccEl = document.getElementById('raceMyAcc');
+  const oppAccEl = document.getElementById('raceOppAcc');
+  const myNameEl = document.getElementById('raceMyName');
+  const oppNameEl = document.getElementById('raceOppName');
+  const statusEl = document.getElementById('raceStatusMsg');
+
+  if (!btnGhost || !inputEl) return;
+
+  function resetRaceState(targetText, oppLabel) {
+    if (raceBotTimer) clearInterval(raceBotTimer);
+    raceTargetText = targetText;
+    sentEl.textContent = raceTargetText;
+    inputEl.value = '';
+    inputEl.disabled = false;
+    inputEl.focus();
+    raceDone = false;
+    raceStartTime = 0;
+    raceOppProgress = 0;
+    if (myProgEl) myProgEl.style.width = '0%';
+    if (oppProgEl) oppProgEl.style.width = '0%';
+    if (myWpmEl) myWpmEl.textContent = '0 WPM';
+    if (oppWpmEl) oppWpmEl.textContent = '0 WPM';
+    if (myAccEl) myAccEl.textContent = '100%';
+    if (oppAccEl) oppAccEl.textContent = '98%';
+    if (myNameEl) myNameEl.textContent = (pNameInput.value.trim() || 'Player 1');
+    if (oppNameEl) oppNameEl.textContent = oppLabel || 'Cyber Ghost';
+    if (statusEl) statusEl.textContent = '⚡ Race is LIVE! Start typing the sentence above!';
+  }
+
+  // Ghost / Bot race
+  btnGhost.addEventListener('click', () => {
+    const sents = TEST_SENTENCES.STANDARD;
+    const chosen = sents[Math.floor(Math.random() * sents.length)] || raceTargetText;
+    resetRaceState(chosen, 'Cyber Ghost (MASM Bot)');
+
+    // Start bot progression at ~65 WPM with slight random variance
+    const botCharsPerSec = 5.5; // ~66 WPM
+    const botStepInterval = 120;
+    let botCharsTyped = 0;
+
+    raceBotTimer = setInterval(() => {
+      if (raceDone) {
+        clearInterval(raceBotTimer);
+        return;
+      }
+      if (raceStartTime > 0) {
+        botCharsTyped += (botCharsPerSec * (botStepInterval / 1000)) * (0.85 + Math.random() * 0.3);
+        const botPct = Math.min(100, Math.round((botCharsTyped / raceTargetText.length) * 100));
+        raceOppProgress = botPct;
+        if (oppProgEl) oppProgEl.style.width = botPct + '%';
+        const elapsedSec = Math.max(1, (Date.now() - raceStartTime) / 1000);
+        const botWpm = Math.round((botCharsTyped / 5) / (elapsedSec / 60));
+        if (oppWpmEl) oppWpmEl.textContent = botWpm + ' WPM';
+
+        if (botPct >= 100 && !raceDone) {
+          raceDone = true;
+          clearInterval(raceBotTimer);
+          inputEl.disabled = true;
+          if (statusEl) {
+            statusEl.innerHTML = '<span style="color:var(--amber)">🤖 Cyber Ghost finished first! Keep practicing!</span>';
+          }
+        }
+      }
+    }, botStepInterval);
+  });
+
+  // Room Join via BroadcastChannel for multi-tab / peer racing
+  btnJoin.addEventListener('click', () => {
+    const room = (rCodeInput.value || '').trim().toUpperCase();
+    if (!room) {
+      showToast('⚠️ Please enter a room code');
+      return;
+    }
+    const myName = (pNameInput.value || 'Player').trim();
+    if (raceChannel) raceChannel.close();
+    raceChannel = new BroadcastChannel('kpm_room_' + room);
+
+    resetRaceState(raceTargetText, `Opponent [${room}]`);
+    if (statusEl) statusEl.textContent = `Connected to Room [${room}] as ${myName}! Type to compete!`;
+
+    raceChannel.onmessage = (e) => {
+      const data = e.data;
+      if (!data || data.sender === myName) return;
+      if (data.type === 'PROGRESS') {
+        if (oppNameEl) oppNameEl.textContent = data.sender;
+        if (oppProgEl) oppProgEl.style.width = data.progress + '%';
+        if (oppWpmEl) oppWpmEl.textContent = data.wpm + ' WPM';
+        if (oppAccEl) oppAccEl.textContent = data.acc + '%';
+        if (data.progress >= 100 && !raceDone) {
+          raceDone = true;
+          inputEl.disabled = true;
+          if (statusEl) statusEl.innerHTML = `<span style="color:var(--amber)">🏆 ${data.sender} won the race!</span>`;
+        }
+      }
+    };
+  });
+
+  // Input typing evaluation
+  inputEl.addEventListener('input', () => {
+    if (raceDone) return;
+    if (raceStartTime === 0) raceStartTime = Date.now();
+
+    const val = inputEl.value;
+    const target = raceTargetText;
+    let errors = 0;
+    for (let i = 0; i < val.length; i++) {
+      if (val[i] !== target[i]) errors++;
+    }
+
+    const elapsedSec = Math.max(0.5, (Date.now() - raceStartTime) / 1000);
+    const correctChars = Math.max(0, val.length - errors);
+    const wpm = Math.round((correctChars / 5) / (elapsedSec / 60));
+    const acc = val.length > 0 ? Math.max(0, Math.round(((val.length - errors) * 100) / val.length)) : 100;
+    const progress = Math.min(100, Math.round((val.length / target.length) * 100));
+
+    if (myProgEl) myProgEl.style.width = progress + '%';
+    if (myWpmEl) myWpmEl.textContent = wpm + ' WPM';
+    if (myAccEl) myAccEl.textContent = acc + '%';
+
+    // Broadcast update to room
+    if (raceChannel) {
+      raceChannel.postMessage({
+        type: 'PROGRESS',
+        sender: pNameInput.value.trim() || 'Player 1',
+        progress,
+        wpm,
+        acc
+      });
+    }
+
+    // Check victory
+    if (val === target) {
+      raceDone = true;
+      if (raceBotTimer) clearInterval(raceBotTimer);
+      inputEl.disabled = true;
+      if (statusEl) statusEl.innerHTML = '<span style="color:var(--green)">🏆 VICTORY! You finished the race first!</span>';
+      spawnKeySparks(window.innerWidth / 2, window.innerHeight / 2, 'var(--gold)');
+      showToast('🎉 Race Completed! First Place!');
+    }
+  });
+}
+
+// ==========================================
+// MASM JSON REPORT IMPORT ENGINE
+// ==========================================
+function initMasmImport() {
+  const fileInput = document.getElementById('fileMasmImport');
+  const btnImport = document.getElementById('btnImportMasm');
+  if (!btnImport || !fileInput) return;
+
+  btnImport.addEventListener('click', () => {
+    fileInput.value = '';
+    fileInput.click();
+  });
+
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const json = JSON.parse(event.target.result);
+        if (!json || typeof json.totalKeys === 'undefined') {
+          showToast('⚠️ Invalid KeyReport.json structure');
+          return;
+        }
+
+        safeSendMessage({ type: 'KPM_GET_STATE' }, (res) => {
+          const s = (res && res.state) || curState || {};
+          s.totalKeys = json.totalKeys || s.totalKeys;
+          s.vowels = json.vowels || s.vowels;
+          s.consonants = json.consonants || s.consonants;
+          s.words = json.words || s.words;
+          s.wpmPeak = Math.max(s.wpmPeak || 0, json.peakWpm || 0);
+          s.wpmAvg = json.avgWpm || s.wpmAvg;
+          s.avgLatMs = json.avgLatencyMs || s.avgLatMs;
+          s.bestStreak = Math.max(s.bestStreak || 0, json.bestStreak || 0);
+          s.leftHand = json.leftHand || s.leftHand;
+          s.rightHand = json.rightHand || s.rightHand;
+
+          safeSendMessage({ type: 'KPM_SET_PREFS', importedState: s }, (r) => {
+            if (r && r.state) render(r.state);
+            showToast('✓ Successfully imported MASM KeyReport.json (v' + (json.schemaVersion || 1) + ')');
+            spawnKeySparks(window.innerWidth / 2, window.innerHeight / 2, 'var(--cyan)');
+          });
+        });
+      } catch (err) {
+        showToast('⚠️ Failed to parse MASM JSON file');
+      }
+    };
+    reader.readAsText(file);
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   initStaticDOM();
   initFX();
   resetTypingTest(false);
+  initMultiplayerRace();
+  initMasmImport();
 
   // If running as a standalone web app (e.g. on Render), show the "Get Chrome Extension (.zip)" button
   const isRealExtension = !!(window.chrome && window.chrome.runtime && window.chrome.runtime.id);

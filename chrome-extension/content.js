@@ -449,16 +449,46 @@
     });
   } catch (_) {}
 
+  // Sensitive input detector for privacy & Chrome Web Store compliance
+  function isSensitiveElement(el) {
+    if (!el || !el.tagName) return false;
+    const tag = el.tagName.toUpperCase();
+    if (tag !== 'INPUT' && tag !== 'TEXTAREA') return false;
+
+    // Check type
+    if (el.type === 'password' || el.type === 'hidden') return true;
+
+    // Check autocomplete attribute
+    const ac = (el.getAttribute('autocomplete') || '').toLowerCase();
+    if (ac.includes('password') || ac.includes('cc-') || ac.includes('credit-card') || ac.includes('cvv') || ac.includes('security-code')) {
+      return true;
+    }
+
+    // Check identifiers (name, id, placeholder, aria-label)
+    const probe = `${el.name || ''} ${el.id || ''} ${el.placeholder || ''} ${el.getAttribute('aria-label') || ''}`.toLowerCase();
+    const sensitiveTerms = ['password', 'passwd', 'pwd', 'secret', 'cvv', 'cvc', 'pin', 'ssn', 'creditcard', 'cardnumber', 'card-number'];
+    for (const term of sensitiveTerms) {
+      if (probe.includes(term)) return true;
+    }
+    return false;
+  }
+
   // Capture keystrokes in real-time with duplicate-dispatch mitigation
   let lastContentKey = '';
   let lastContentTime = 0;
+  let privacyMode = false;
 
   function onKeyDown(e) {
     try {
+      // Hotkey: Ctrl + Shift + P toggles local Privacy Mode
+      if (e.ctrlKey && e.shiftKey && (e.key === 'P' || e.key === 'p')) {
+        privacyMode = !privacyMode;
+        return;
+      }
+      if (privacyMode) return;
+
       if (e.isComposing) return;
-      // Never log password inputs for security & Chrome Web Store compliance
-      const el = e.target;
-      if (el && el.tagName === 'INPUT' && el.type === 'password') return;
+      if (isSensitiveElement(e.target)) return;
       if (['Shift', 'Control', 'Alt', 'Meta', 'CapsLock'].includes(e.key)) return;
 
       const now = Date.now();
@@ -478,14 +508,39 @@
     } catch (_) {
       // Extension context invalidated on reload — self-remove stale HUD and listener
       window.removeEventListener('keydown', onKeyDown, true);
+      window.removeEventListener('compositionend', onCompositionEnd, true);
       if (hudHost) { hudHost.remove(); hudHost = null; }
     }
   }
 
+  // Handle Indic / IME composition completions (Bengali, Hindi, etc.)
+  function onCompositionEnd(e) {
+    try {
+      if (privacyMode || isSensitiveElement(e.target)) return;
+      const text = e.data || '';
+      if (!text) return;
+
+      for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        chrome.runtime.sendMessage({
+          type: 'KPM_KEY',
+          payload: {
+            key: char,
+            code: 'Indic'
+          }
+        }, (res) => {
+          if (res && res.state) updateHud(res.state);
+        });
+      }
+    } catch (_) {}
+  }
+
   window.addEventListener('keydown', onKeyDown, true);
+  window.addEventListener('compositionend', onCompositionEnd, true);
 
   window.__kpmCleanup = () => {
     window.removeEventListener('keydown', onKeyDown, true);
+    window.removeEventListener('compositionend', onCompositionEnd, true);
     if (hudHost) { hudHost.remove(); hudHost = null; }
   };
 })();

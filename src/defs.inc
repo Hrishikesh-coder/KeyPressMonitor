@@ -102,8 +102,10 @@ NTHEMES           EQU 8           ; colour themes
 NBADGES           EQU 8           ; unlockable achievements
 RIPPLE_MS         EQU 600         ; heatmap ripple length
 RIPPLE_STEP       EQU 70          ; ms for the ripple to move one key further
-STAT_N            EQU 12          ; DWORDs in KeyStats.dat
-STAT_MAGIC        EQU 314D504Bh   ; "KPM1"
+STAT_N_V1         EQU 12          ; Legacy v1 DWORDs (48 bytes)
+STAT_MAGIC_V1     EQU 314D504Bh   ; "KPM1"
+STAT_N            EQU 16          ; v2 DWORDs in KeyStats.dat (64 bytes)
+STAT_MAGIC        EQU 324D504Bh   ; "KPM2"
 ST_TOTAL          EQU 1           ; KeyStats.dat fields (DWORD index)
 ST_VOW            EQU 2
 ST_CON            EQU 3
@@ -115,6 +117,10 @@ ST_BS             EQU 8
 ST_BEST           EQU 9           ; best peak WPM of all sessions
 ST_TBEST          EQU 10          ; best typing test WPM of all sessions
 ST_SESS           EQU 11          ; number of sessions
+ST_VERSION        EQU 12          ; Schema version (2)
+ST_IND_VOW        EQU 13          ; Indic vowels count
+ST_IND_CON        EQU 14          ; Indic consonants count
+ST_RESERVED       EQU 15          ; Reserved for future expansion
 NG2               EQU 26 * 26     ; possible bigrams (a-z)
 NG3               EQU 26 * 26 * 26 ; possible trigrams
 

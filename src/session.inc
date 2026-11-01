@@ -155,10 +155,26 @@ LoadStats PROC USES ebx
     mov  ebx, eax
     invoke ReadFile, ebx, ADDR lastStats, STAT_N * 4, ADDR nRead, 0
     invoke CloseHandle, ebx
+
+    ; Check if modern V2 first ("KPM2", 64 bytes)
     cmp  nRead, STAT_N * 4
-    jne  ls_done
+    jne  ls_check_v1
     cmp  lastStats, STAT_MAGIC
+    je   ls_valid
+
+ls_check_v1:
+    ; Check if legacy V1 ("KPM1", 48 bytes)
+    cmp  nRead, STAT_N_V1 * 4
     jne  ls_done
+    cmp  lastStats, STAT_MAGIC_V1
+    jne  ls_done
+    ; Seamlessly migrate legacy V1 into V2 in memory
+    mov  lastStats[ST_VERSION*4], 1
+    mov  lastStats[ST_IND_VOW*4], 0
+    mov  lastStats[ST_IND_CON*4], 0
+    mov  lastStats[ST_RESERVED*4], 0
+
+ls_valid:
     mov  hasLast, 1
     mov  eax, lastStats[ST_BEST*4]
     mov  bestPeakAll, eax
@@ -173,7 +189,7 @@ SaveStats PROC USES ebx
     cmp  recCount, 0                ; nothing typed live (e.g. only a replay)
     je   sv_done
     invoke UpdateStats
-    mov  statBuf, STAT_MAGIC
+    mov  statBuf, STAT_MAGIC        ; Always save modern "KPM2" format
     mov  eax, totalKeys
     mov  statBuf[ST_TOTAL*4], eax
     mov  eax, vowels
@@ -201,6 +217,10 @@ sv_best:
     mov  eax, lastStats[ST_SESS*4]
     inc  eax
     mov  statBuf[ST_SESS*4], eax
+    mov  statBuf[ST_VERSION*4], 2   ; Schema version 2
+    mov  statBuf[ST_IND_VOW*4], 0   ; Indic vowels
+    mov  statBuf[ST_IND_CON*4], 0   ; Indic consonants
+    mov  statBuf[ST_RESERVED*4], 0
     invoke CreateFileA, ADDR sStatsFile, 40000000h, 0, 0, 2, 80h, 0   ; write, CREATE_ALWAYS
     cmp  eax, -1
     je   sv_done

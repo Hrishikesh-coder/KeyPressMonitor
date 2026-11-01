@@ -1,7 +1,29 @@
 // KeyPressMonitor — Background Service Worker (Manifest V3)
 // Aggregates real-time keystroke analytics from any webpage or the dashboard.
 
+const CURRENT_SCHEMA_VERSION = 2;
+
 const VOWELS = new Set(['a', 'e', 'i', 'o', 'u']);
+
+// Indic Unicode Ranges & Sets (Bengali & Devanagari)
+const BENGALI_VOWELS = new Set(['অ','আ','ই','ঈ','উ','ঊ','ঋ','এ','ঐ','ও','ঔ']);
+const BENGALI_MATRAS = new Set(['া','ি','ী','ু','ূ','ৃ','ৄ','ে','ৈ','ো','ৌ']);
+const BENGALI_CONSONANTS = new Set([
+  'ক','খ','গ','ঘ','ঙ','চ','ছ','জ','ঝ','ঞ','ট','ঠ','ড','ঢ','ণ',
+  'ত','থ','দ','ধ','ন','প','ফ','ব','ভ','ম','য','র','ল','শ','ষ',
+  'স','হ','ড়','ঢ়','য়','ৎ'
+]);
+const BENGALI_MODIFIERS = new Set(['ঁ','ং','ঃ','্']);
+
+const DEVANAGARI_VOWELS = new Set(['अ','आ','इ','ई','उ','ऊ','ऋ','ए','ऐ','ओ','औ']);
+const DEVANAGARI_MATRAS = new Set(['ा','ि','ी','ु','ू','ृ','ॄ','े','ै','ो','ौ']);
+const DEVANAGARI_CONSONANTS = new Set([
+  'क','ख','ग','घ','ङ','च','छ','ज','झ','ञ','ट','ठ','ड','ढ','ण',
+  'त','थ','द','ध','न','प','फ','ब','भ','म','य','र','ल','व','श',
+  'ष','स','ह','क़','ख़','ग़','ज़','ड़','ढ़','फ़','य़'
+]);
+const DEVANAGARI_MODIFIERS = new Set(['ँ','ं','ः','्']);
+
 const FINGER_MAP = {
   a: 0, b: 3, c: 2, d: 2, e: 2, f: 3, g: 3, h: 4, i: 5, j: 4,
   k: 5, l: 6, m: 4, n: 4, o: 6, p: 7, q: 0, r: 3, s: 1, t: 3,
@@ -15,6 +37,7 @@ const ROW_MAP = {
 
 function defaultState() {
   return {
+    schemaVersion: CURRENT_SCHEMA_VERSION,
     paused: false,
     hudOn: true,
     theme: 'midnight',
@@ -24,6 +47,9 @@ function defaultState() {
     totalKeys: 0,
     vowels: 0,
     consonants: 0,
+    indicVowels: 0,
+    indicConsonants: 0,
+    indicMatras: 0,
     digits: 0,
     spaces: 0,
     symbols: 0,
@@ -70,9 +96,21 @@ function defaultState() {
 
 let state = defaultState();
 
+// Automatic backwards-compatible schema migration
 chrome.storage.local.get(['kpmState'], (res) => {
   if (res && res.kpmState) {
-    state = Object.assign(defaultState(), res.kpmState);
+    const loaded = res.kpmState;
+    const oldVersion = loaded.schemaVersion || 1;
+    state = Object.assign(defaultState(), loaded);
+    if (oldVersion < CURRENT_SCHEMA_VERSION) {
+      state.schemaVersion = CURRENT_SCHEMA_VERSION;
+      if (typeof state.indicVowels === 'undefined') state.indicVowels = 0;
+      if (typeof state.indicConsonants === 'undefined') state.indicConsonants = 0;
+      if (typeof state.indicMatras === 'undefined') state.indicMatras = 0;
+      chrome.storage.local.set({ kpmState: state });
+    }
+  }
+});
   }
 });
 
@@ -179,6 +217,10 @@ function recordKeyEvent(payload) {
   const lower = key.length === 1 ? key.toLowerCase() : '';
   const isLetter = lower >= 'a' && lower <= 'z';
   const isDigit = lower >= '0' && lower <= '9';
+  const isIndicVowel = BENGALI_VOWELS.has(key) || DEVANAGARI_VOWELS.has(key);
+  const isIndicMatra = BENGALI_MATRAS.has(key) || DEVANAGARI_MATRAS.has(key);
+  const isIndicConsonant = BENGALI_CONSONANTS.has(key) || DEVANAGARI_CONSONANTS.has(key);
+  const isIndicModifier = BENGALI_MODIFIERS.has(key) || DEVANAGARI_MODIFIERS.has(key);
 
   if (isLetter) {
     if (VOWELS.has(lower)) state.vowels++;
@@ -206,6 +248,21 @@ function recordKeyEvent(payload) {
     else state.rightHand++;
     if (state.lastHand !== -1 && state.lastHand !== hand) state.handAlt++;
     state.lastHand = hand;
+  } else if (isIndicVowel || isIndicMatra) {
+    state.vowels++;
+    state.indicVowels++;
+    if (isIndicMatra) state.indicMatras++;
+    state.prevL1 = '';
+    state.prevL2 = '';
+  } else if (isIndicConsonant) {
+    state.consonants++;
+    state.indicConsonants++;
+    state.prevL1 = '';
+    state.prevL2 = '';
+  } else if (isIndicModifier) {
+    state.symbols++;
+    state.prevL1 = '';
+    state.prevL2 = '';
   } else {
     state.prevL1 = '';
     state.prevL2 = '';
@@ -233,8 +290,9 @@ function recordKeyEvent(payload) {
     }
   }
 
-  // Word counter
-  if (isLetter || isDigit) {
+  // Word counter (recognizes English letters, numbers, and Indic glyphs)
+  const isWordChar = isLetter || isDigit || isIndicVowel || isIndicMatra || isIndicConsonant;
+  if (isWordChar) {
     if (!state.inWord) {
       state.words++;
       state.inWord = true;
@@ -297,6 +355,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
     sendResponse({ ok: true });
   } else if (msg.type === 'KPM_SET_PREFS') {
+    if (msg.importedState) state = Object.assign(state, msg.importedState);
     if (typeof msg.nView === 'number') state.nView = Math.max(8, Math.min(64, msg.nView));
     if (msg.theme) state.theme = msg.theme;
     if (typeof msg.soundOn === 'boolean') state.soundOn = msg.soundOn;
